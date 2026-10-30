@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Phrase Collector">
+  <defs>
+    <linearGradient id="dusk" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4a5878"/>
+      <stop offset="100%" stop-color="#7d86ad"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f7dd91"/>
+      <stop offset="100%" stop-color="#ebc86c"/>
+    </linearGradient>
+    <clipPath id="round"><rect width="64" height="64" rx="16"/></clipPath>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#dusk)"/>
+  <g clip-path="url(#round)">
+  <circle cx="48" cy="15" r="6.5" fill="#e8a6a3"/>
+  <path d="M12 17.5H32" fill="none" stroke="#fffaf5" stroke-width="3.2" stroke-linecap="round" opacity=".55"/>
+  <rect x="9.5" y="23" width="33" height="11" rx="5.5" fill="url(#gold)"/>
+  <path d="M15 28.5H37" fill="none" stroke="#3f4a66" stroke-width="3.4" stroke-linecap="round"/>
+  <path d="M12 39.5H26" fill="none" stroke="#fffaf5" stroke-width="3.2" stroke-linecap="round" opacity=".55"/>
+  <path d="M0 46 C11 39 20 50 32 45 S52 40 64 46 V64 H0Z" fill="#92c1ba" opacity=".46"/>
+  <path d="M0 54 C14 48 21 59 34 54 S53 49 64 53 V64 H0Z" fill="#aacbdc" opacity=".55"/>
+  <path d="M18 51 Q32 56 46 51" fill="none" stroke="#fffaf2" stroke-width="2" stroke-linecap="round" opacity=".85"/>
+  </g>
+</svg>

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>Phrase Collector</title>
+  <link rel="icon" type="image/svg+xml" href="../icons/icon.svg">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <img src="../icons/icon.svg" alt="">
+    <span class="name"><small>SELECTION · ANKI</small>Phrase Collector</span>
+    <label class="switch" data-i18n-title="启用 / 停用插件" title="启用 / 停用插件"><input type="checkbox" id="enabled"><span></span></label>
+  </header>
+  <section class="site">
+    <div class="host" id="host">—</div>
+    <div class="state" id="state"></div>
+    <button id="toggleSite" class="primary"></button>
+  </section>
+  <section class="checks">
+    <div class="check" id="aiCheck"><span class="dot"></span><span class="text">AI</span></div>
+    <div class="check" id="ankiCheck"><span class="dot"></span><span class="text">Anki</span></div>
+  </section>
+  <section class="actions" id="actions"></section>
+  <footer>
+    <button id="openOptions" data-i18n="打开设置">打开设置</button>
+  </footer>
+  <script src="../shared/default-prompts.js"></script>
+  <script src="../shared/i18n.js"></script>
+  <script src="../shared/core.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
