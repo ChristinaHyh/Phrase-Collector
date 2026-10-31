@@ -106,6 +106,8 @@ Edge、Brave 等基于 Chromium 的浏览器也可以用同样的方式安装。
 
 ### 隐私
 
+[隐私政策 / Privacy Policy](https://ChristinaHyh.github.io/Phrase-Collector/privacy-policy.html)
+
 - API Key 和全部设置只保存在浏览器本地（`chrome.storage.local`），不会上传到任何地方。
 - 划词内容只发送给你配置的 AI 接口。只有在开启「在线音频」时，才会把发音文本发送给有道或 Google。
 - 插件仅在白名单网站上响应划词（除非你切换为「所有网站」）。
