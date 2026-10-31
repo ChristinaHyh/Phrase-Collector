@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phrase Collector Privacy Policy · 隐私政策</title>
+<style>
+  :root { --fg: #2b2f3a; --muted: #6b7080; --line: #e4e2dc; --bg: #fbfaf7; --accent: #5d6a8f; }
+  @media (prefers-color-scheme: dark) { :root { --fg: #e6e7ec; --muted: #a2a6b4; --line: #33364a; --bg: #1c1d26; --accent: #a9b4d8; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.75 -apple-system, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 48px 20px 80px; }
+  h1 { font: 600 30px/1.25 Georgia, serif; margin: 0 0 6px; }
+  h2 { font-size: 19px; margin: 34px 0 8px; }
+  .meta { color: var(--muted); font-size: 14px; }
+  nav a, a { color: var(--accent); }
+  hr { border: 0; border-top: 1px solid var(--line); margin: 56px 0; }
+  li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<main>
+<h1>Phrase Collector 隐私政策</h1>
+<p class="meta">生效日期：2026 年 10 月 30 日 · <a href="#english">English</a></p>
+
+<p>Phrase Collector 是一个浏览器扩展：你在网页上选中文字后，它用你自己配置的 AI 服务解析内容，并可通过 AnkiConnect 制作成 Anki 卡片。本扩展没有服务端，开发者不会收集、存储或接收你的任何数据。</p>
+
+<h2>保存在你设备上的数据</h2>
+<ul>
+  <li>设置：AI 服务地址、API Key、模型、划词动作、网站白名单、主题和界面语言。</li>
+  <li>结果缓存：最近的解析结果，用于再次划选同一内容时直接显示。</li>
+</ul>
+<p>以上数据只保存在浏览器本地存储（<code>chrome.storage.local</code>）中，不会同步或上传。卸载扩展会一并删除。你也可以在设置页清除缓存或恢复默认设置。</p>
+
+<h2>会离开你设备的数据</h2>
+<p>只有在你主动操作时，扩展才会发出以下请求，且只发往你选择的服务：</p>
+<ul>
+  <li><b>你配置的 AI 服务</b>：选中的文字、所在段落、网页标题和网址，以及你的 API Key（作为身份验证）。这些数据的处理受该服务商隐私政策约束。</li>
+  <li><b>本机的 AnkiConnect</b>（默认 <code>http://127.0.0.1:8765</code>）：要写入卡片的内容。数据不会离开你的电脑。</li>
+  <li><b>在线发音（可选，默认关闭）</b>：开启后，要朗读的单词或短语会发送给有道（dict.youdao.com）或 Google（translate.google.com）以下载音频。</li>
+</ul>
+
+<h2>我们不做的事</h2>
+<ul>
+  <li>不收集浏览历史，也不读取白名单以外网站的内容。</li>
+  <li>不使用分析、统计或广告服务。</li>
+  <li>不出售、不转让任何用户数据，也不将其用于与扩展功能无关的目的。</li>
+</ul>
+
+<h2>变更</h2>
+<p>如果本政策有变更，会更新本页面并修改生效日期。</p>
+
+<h2>联系</h2>
+<p>有任何问题，请联系：<a href="mailto:me@hyahui.com">me@hyahui.com</a></p>
+
+<hr>
+
+<h1 id="english">Phrase Collector Privacy Policy</h1>
+<p class="meta">Effective date: October 30, 2026</p>
+
+<p>Phrase Collector is a browser extension. When you select text on a web page, it explains the text using an AI provider you configure and can turn the result into an Anki card through AnkiConnect. The extension has no server. The developer does not collect, store or receive any of your data.</p>
+
+<h2>Data stored on your device</h2>
+<ul>
+  <li>Settings: AI provider endpoint, API key, model, actions, site whitelist, theme and interface language.</li>
+  <li>Result cache: recent explanations, shown again when you select the same text.</li>
+</ul>
+<p>This data is kept only in the browser's local storage (<code>chrome.storage.local</code>). It is never synced or uploaded, and it is removed when you uninstall the extension. You can also clear the cache or reset settings from the settings page.</p>
+
+<h2>Data that leaves your device</h2>
+<p>The extension sends requests only when you act, and only to the services you choose:</p>
+<ul>
+  <li><b>Your AI provider</b>: the selected text, its surrounding paragraph, the page title and URL, and your API key for authentication. The provider's own privacy policy applies to this data.</li>
+  <li><b>AnkiConnect on your computer</b> (<code>http://127.0.0.1:8765</code> by default): the content of the card being added. This data does not leave your computer.</li>
+  <li><b>Online audio (optional, off by default)</b>: when turned on, the word or phrase to pronounce is sent to Youdao (dict.youdao.com) or Google (translate.google.com) to download audio.</li>
+</ul>
+
+<h2>What we don't do</h2>
+<ul>
+  <li>We don't collect browsing history or read pages on sites outside your whitelist.</li>
+  <li>We don't use analytics, tracking or advertising services.</li>
+  <li>We don't sell or transfer user data, or use it for purposes unrelated to the extension's function.</li>
+</ul>
+
+<h2>Changes</h2>
+<p>If this policy changes, this page and its effective date will be updated.</p>
+
+<h2>Contact</h2>
+<p>Questions: <a href="mailto:me@hyahui.com">me@hyahui.com</a></p>
+</main>
+</body>
+</html>
