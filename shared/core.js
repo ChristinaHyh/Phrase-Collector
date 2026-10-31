@@ -5,6 +5,30 @@
   const STORAGE_KEY = 'pc_config';
   const CONFIG_VERSION = 1;
 
+  // 原文语言和解释语言的常用选项（也可以直接输入其它语言）：[代码, 名称, 英文名, 中文别名]
+  const LANGUAGES = [
+    ['zh-CN', '简体中文', 'Chinese', '中文 简体 汉语 普通话 simplified chinese'],
+    ['en', 'English', 'English', '英语 英文'],
+    ['ja', '日本語', 'Japanese', '日语 日文'],
+    ['es', 'Español', 'Spanish', '西班牙语 西语'],
+    ['de', 'Deutsch', 'German', '德语 德文'],
+    ['fr', 'Français', 'French', '法语 法文'],
+    ['ru', 'Русский', 'Russian', '俄语 俄文'],
+    ['it', 'Italiano', 'Italian', '意大利语'],
+  ];
+  const TARGET_LANGUAGES = LANGUAGES.map((l) => l[1]);
+  const DEFAULT_TARGET_LANGUAGE = '简体中文';
+
+  // 语言名称或代码 → 语言代码（zh-CN、es…），认不出时返回空
+  function langCode(language) {
+    const s = String(language || '').trim();
+    if (!s) return '';
+    const low = s.toLowerCase();
+    const hit = LANGUAGES.find(([code, name, en, alias]) => [code.toLowerCase(), name.toLowerCase(), en.toLowerCase(), ...alias.split(' ')].includes(low));
+    if (hit) return hit[0];
+    return /^[a-z]{2,3}([-_][a-z0-9]{2,8})*$/i.test(s) ? normalizeLang(s) : '';
+  }
+
   // ---------------------------------------------------------------------------
   // Anki 托管笔记模板。[[TTS]] 会在同步到 Anki 时替换为发音标签（见 background.js）。
   // ---------------------------------------------------------------------------
@@ -57,40 +81,41 @@ hr#answer{border:none;border-top:1px dashed var(--pc-hr);margin:16px 0;}`;
   const foldSection = (field, label) =>
     `{{#${field}}}<details class="pc-section pc-fold"><summary class="pc-label">${label}</summary><div class="pc-value">{{${field}}}</div></details>{{/${field}}}`;
 
-  const PHRASE_FRONT = `<div class="pc-card">
+  // L：当前解释语言的标签（PC_PROMPTS.labels）
+  const PHRASE_FRONT = (L) => `<div class="pc-card">
 <div class="pc-hero">Phrase in Context</div>
 <div class="pc-main">{{Expression}}</div>
 <div class="pc-audio">[[TTS]]</div>
 {{#ContextEN}}<div class="pc-context">{{ContextEN}}</div>{{/ContextEN}}
-<div class="pc-prompt">回想它在这句话里的意思</div>
+<div class="pc-prompt">${L.phrasePrompt}</div>
 </div>`;
 
-  const PHRASE_BACK = `<div class="pc-answer">{{FrontSide}}</div>
+  const PHRASE_BACK = (L) => `<div class="pc-answer">{{FrontSide}}</div>
 <div class="pc-card">
 <hr id="answer">
 <div class="pc-meaning">{{MeaningZH}}</div>
-${section('ContextZH', '原句译文 · Context')}
-${foldSection('NuanceZH', '语感 · Nuance')}
-${foldSection('PatternEN', '可迁移表达 · Pattern')}
+${section('ContextZH', L.cardContext)}
+${foldSection('NuanceZH', L.cardNuance)}
+${foldSection('PatternEN', L.cardPattern)}
 {{#SourceURL}}<div class="pc-source">{{#SourceTitle}}{{SourceTitle}}<br>{{/SourceTitle}}{{SourceURL}}</div>{{/SourceURL}}
 </div>`;
 
-  const SENTENCE_FRONT = `<div class="pc-card">
+  const SENTENCE_FRONT = (L) => `<div class="pc-card">
 <div class="pc-hero">Sentence Decode</div>
 <div class="pc-main pc-sentence">{{SentenceEN}}</div>
 <div class="pc-audio">[[TTS]]</div>
-<div class="pc-prompt">先尝试理解整句，再翻面检查结构与逻辑</div>
+<div class="pc-prompt">${L.sentencePrompt}</div>
 </div>`;
 
-  const SENTENCE_BACK = `<div class="pc-answer">{{FrontSide}}</div>
+  const SENTENCE_BACK = (L) => `<div class="pc-answer">{{FrontSide}}</div>
 <div class="pc-card">
 <hr id="answer">
 <div class="pc-meaning">{{SentenceZH}}</div>
-${section('Core', '句子主干 · Core')}
-${section('Chunks', '意群划分 · Chunks')}
-${section('LogicZH', '逻辑关系 · Logic')}
-${section('HardPartZH', '阅读难点 · Hard Part')}
-${section('Takeaways', '迁移表达 · Takeaways')}
+${section('Core', L.cardCore)}
+${section('Chunks', L.cardChunks)}
+${section('LogicZH', L.cardLogic)}
+${section('HardPartZH', L.cardHard)}
+${section('Takeaways', L.cardTakeaways)}
 {{#SourceURL}}<div class="pc-source">{{SourceURL}}</div>{{/SourceURL}}
 </div>`;
 
@@ -111,16 +136,25 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
     return { front, back, css: ANKI_CSS };
   }
 
-  function schema(fields, fills = {}) {
-    return fields.map(([name, description]) => ({
+  function schema(names, descriptions, fills = {}) {
+    return names.map((name) => ({
       id: uid(),
       name,
-      description: fills[name] ? '' : description,
+      description: fills[name] ? '' : descriptions[name] || '',
       fill: fills[name] || 'ai',
     }));
   }
 
-  function defaultActions() {
+  // 内置动作的默认值随解释语言变化：提示词有中文、英文两套，标签按 PC_PROMPTS.labels，其他语言用英文
+  function presetLocale(language) {
+    const code = langCode(language);
+    return P.labels[code] ? code : 'en';
+  }
+
+  function defaultActions(language = DEFAULT_TARGET_LANGUAGE) {
+    const loc = presetLocale(language);
+    const L = P.labels[loc];
+    const text = (b) => b.text[loc] || b.text.en;
     return [
       {
         id: 'phrase-in-context',
@@ -130,17 +164,17 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
         enabled: true,
         providerId: 'deepseek-default',
         shortcut: P.phrase.shortcut,
-        systemPrompt: P.phrase.systemPrompt,
+        systemPrompt: text(P.phrase).systemPrompt,
         prompt: P.phrase.prompt,
-        outputSchema: schema(P.phrase.fields, { SourceTitle: 'webTitle', SourceURL: 'webUrl' }),
-        layout: P.phrase.layout,
+        outputSchema: schema(P.phrase.fields, text(P.phrase).fields, { SourceTitle: 'webTitle', SourceURL: 'webUrl' }),
+        layout: P.phrase.layout(L),
         autoAddToAnki: false,
         anki: {
           deck: 'Phrase Collector::Phrases',
           modelMode: 'managed',
           modelName: 'Phrase Collector · Phrase',
-          front: PHRASE_FRONT,
-          back: PHRASE_BACK,
+          front: PHRASE_FRONT(L),
+          back: PHRASE_BACK(L),
           css: ANKI_CSS,
           fieldMap: {},
           tags: 'PhraseCollector Phrase',
@@ -158,17 +192,17 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
         enabled: true,
         providerId: 'deepseek-default',
         shortcut: P.sentence.shortcut,
-        systemPrompt: P.sentence.systemPrompt,
+        systemPrompt: text(P.sentence).systemPrompt,
         prompt: P.sentence.prompt,
-        outputSchema: schema(P.sentence.fields, { SourceURL: 'webUrl' }),
-        layout: P.sentence.layout,
+        outputSchema: schema(P.sentence.fields, text(P.sentence).fields, { SourceURL: 'webUrl' }),
+        layout: P.sentence.layout(L),
         autoAddToAnki: false,
         anki: {
           deck: 'Phrase Collector::Sentences',
           modelMode: 'managed',
           modelName: 'Phrase Collector · Sentence',
-          front: SENTENCE_FRONT,
-          back: SENTENCE_BACK,
+          front: SENTENCE_FRONT(L),
+          back: SENTENCE_BACK(L),
           css: ANKI_CSS,
           fieldMap: {},
           tags: 'PhraseCollector Sentence',
@@ -189,11 +223,11 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
       enabled: true,
       providerId: 'deepseek-default',
       shortcut: '',
-      systemPrompt: '你是一位英语学习助手。',
+      systemPrompt: '你是一位语言学习助手。原文可以是任何语言，解释使用{{targetLanguage}}。',
       prompt: 'Selection:\n{{selection}}\n\nContext:\n{{paragraphs}}\n\nExplain the selection in {{targetLanguage}}.',
       outputSchema: [
-        { id: uid(), name: 'Front', description: '选中的英文表达', fill: 'ai' },
-        { id: uid(), name: 'Back', description: '中文解释', fill: 'ai' },
+        { id: uid(), name: 'Front', description: '选中的表达，保持原文语言', fill: 'ai' },
+        { id: uid(), name: 'Back', description: '用{{targetLanguage}}写的解释', fill: 'ai' },
       ],
       layout: '',
       autoAddToAnki: false,
@@ -240,7 +274,8 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
         toolbarTrigger: 'auto', // auto：划词后显示工具栏；shortcut：仅快捷键
         toolbarStyle: 'standard', // standard：图标 + 名称 + 快捷键；lite：只显示图标
         cacheResults: true, // 同一页面再次划选同一内容时直接显示上次结果
-        targetLanguage: '简体中文',
+        sourceLanguage: '', // 原文语言，空值表示自动识别
+        targetLanguage: DEFAULT_TARGET_LANGUAGE, // 解释语言
         maxContextChars: 2000,
         uiLanguage: defaultUiLanguage(), // zh：中文界面；en：English
       },
@@ -256,7 +291,7 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
           jsonMode: true,
         },
       ],
-      actions: defaultActions(),
+      actions: defaultActions(DEFAULT_TARGET_LANGUAGE),
       anki: {
         url: 'http://127.0.0.1:8765',
         apiKey: '',
@@ -293,6 +328,7 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
       outputSchema: Array.isArray(a.outputSchema) ? a.outputSchema : [],
       anki: { ...blankAnki, ...(a.anki || {}) },
     }));
+    localizeBuiltins(cfg);
     cfg.version = CONFIG_VERSION;
     setLang(cfg.general.uiLanguage);
     return cfg;
@@ -313,6 +349,87 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
     return action;
   }
 
+  // 内置动作中随解释语言切换的内容。值仍是某个版本的默认值（未改动过）时，换成当前解释语言的默认值；改过的保留
+  const LOCALIZED_KEYS = {
+    systemPrompt: (a) => a.systemPrompt,
+    prompt: (a) => a.prompt,
+    layout: (a) => a.layout,
+    front: (a) => a.anki.front,
+    back: (a) => a.anki.back,
+  };
+  const assign = { front: (a, v) => (a.anki.front = v), back: (a, v) => (a.anki.back = v) };
+
+  // 旧版默认值的指纹：1.0.0（只支持英语原文、固定输出简体中文）和多语言版首版
+  const LEGACY_DEFAULTS = {
+    phrase: {
+      systemPrompt: ['1w99r3o5ggc', '28y2gg08plh'],
+      prompt: ['1gytvibtvha', 'j8sbfsoxh7'],
+      back: ['24owkj520sz'],
+      fields: {
+        Expression: ['1pfmpkt8b8x', '2q3ik6oabc'],
+        MeaningZH: ['1ljihoqkprh', '1yhfar8ygjy'],
+        ContextEN: ['26daqsbcy4e', '1d30m9o1sj3'],
+        ContextZH: ['1mpkc3fl6ds', '1vcguqb40lb'],
+        NuanceZH: ['ftw7g6zfxi', 'g5rlsz50r8'],
+        PatternEN: ['qb0x5bm5gu', 'wdlt9g2n8i'],
+      },
+    },
+    sentence: {
+      systemPrompt: ['qbvz89ejpk', 'a8omm9h6p4'],
+      prompt: ['xtjwlavvss', '1h4v1jt9tiv'],
+      fields: {
+        SentenceEN: ['15566ufwrfn', '4vuokf823l'],
+        SentenceZH: ['10si4o3mc0u', '13y7rv23as1'],
+        Core: ['4nfiewjosi', 'kbzbuy4xpa'],
+        Chunks: ['13b8t3p3pm0', '1xoe06dzvts'],
+        LogicZH: ['1339pmewc2n', '1i3hrtsxqon'],
+        HardPartZH: ['27o9sa03db2', '23xbe4sdlq4'],
+        Takeaways: ['18aqh9xhm71', '2ecavaj9xq8'],
+      },
+    },
+  };
+
+  let knownDefaults;
+  // 每个内置动作、每项内容所有版本默认值的指纹集合
+  function getKnownDefaults() {
+    if (knownDefaults) return knownDefaults;
+    knownDefaults = {};
+    for (const [builtin, legacy] of Object.entries(LEGACY_DEFAULTS)) {
+      const known = (knownDefaults[builtin] = { fields: {} });
+      for (const key of Object.keys(LOCALIZED_KEYS)) known[key] = new Set(legacy[key] || []);
+      for (const [name, hashes] of Object.entries(legacy.fields)) known.fields[name] = new Set(hashes);
+    }
+    for (const loc of Object.keys(P.labels)) {
+      for (const def of defaultActions(loc)) {
+        const known = knownDefaults[def.builtin];
+        for (const [key, get] of Object.entries(LOCALIZED_KEYS)) known[key].add(hashString(get(def)));
+        for (const f of def.outputSchema) if (f.description) (known.fields[f.name] ||= new Set()).add(hashString(f.description));
+      }
+    }
+    return knownDefaults;
+  }
+
+  function localizeBuiltin(action, language) {
+    const known = action.builtin && getKnownDefaults()[action.builtin];
+    if (!known) return action;
+    const def = builtinDefaults(action.builtin, language);
+    for (const [key, get] of Object.entries(LOCALIZED_KEYS)) {
+      const cur = get(action) || '';
+      if (cur !== get(def) && known[key].has(hashString(cur))) (assign[key] || ((a, v) => (a[key] = v)))(action, get(def));
+    }
+    for (const f of action.outputSchema) {
+      const d = def.outputSchema.find((x) => x.name === f.name)?.description;
+      if (d != null && f.description !== d && known.fields[f.name]?.has(hashString(f.description || ''))) f.description = d;
+    }
+    return action;
+  }
+
+  // 解释语言改变后调用（normalizeConfig 也会调用）
+  function localizeBuiltins(cfg) {
+    for (const a of cfg.actions) localizeBuiltin(a, cfg.general.targetLanguage);
+    return cfg;
+  }
+
   async function loadConfig() {
     const res = await chrome.storage.local.get(STORAGE_KEY);
     return normalizeConfig(res[STORAGE_KEY]);
@@ -322,8 +439,8 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
     await chrome.storage.local.set({ [STORAGE_KEY]: cfg });
   }
 
-  function builtinDefaults(builtin) {
-    return defaultActions().find((a) => a.builtin === builtin);
+  function builtinDefaults(builtin, language) {
+    return defaultActions(language).find((a) => a.builtin === builtin);
   }
 
   // ---------------------------------------------------------------------------
@@ -591,6 +708,99 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
   }
 
   // ---------------------------------------------------------------------------
+  // 网站授权：白名单规则 → Chrome 匹配模式。划词脚本只注册到已授权的网站上。
+  // 无法换算成具体网站的规则（正则、主机名中间带 *）需要授权所有网站。
+  // ---------------------------------------------------------------------------
+  const ALL_SITES = '*://*/*';
+
+  function originPatternsForRule(rule) {
+    const p = String(rule || '').trim();
+    if (!p || p.startsWith('#')) return [];
+    if (p.length > 2 && p.startsWith('/') && p.endsWith('/')) return [ALL_SITES];
+    const m = p.match(/^([a-z*]+):\/\/([^/]*)/i);
+    const scheme = m ? m[1].toLowerCase() : '*';
+    if (!['*', 'http', 'https'].includes(scheme)) return [];
+    let host = (m ? m[2] : p.split('/')[0]).toLowerCase().replace(/:\d+$/, '').replace(/\.$/, '');
+    if (!host || host === '*') return [ALL_SITES];
+    if (host.replace(/^\*\./, '').includes('*')) return [ALL_SITES];
+    // 只写主机名的规则匹配该域名及全部子域名（与 patternMatches 一致）
+    const hostOnly = !m && !p.includes('/');
+    if (hostOnly && !host.startsWith('*.') && host !== 'localhost' && !/^\d+(\.\d+){3}$/.test(host)) host = '*.' + host;
+    return [`${scheme}://${host}/*`];
+  }
+
+  function originPatterns(cfg) {
+    if (cfg.general.siteMode === 'all') return [ALL_SITES];
+    const out = new Set((cfg.general.whitelist || []).flatMap(originPatternsForRule));
+    return out.has(ALL_SITES) ? [ALL_SITES] : [...out];
+  }
+
+  // 接口地址 → 匹配模式，如 https://api.example.com/*
+  function originPatternForUrl(url) {
+    try {
+      const u = new URL(url);
+      return /^https?:$/.test(u.protocol) ? `${u.protocol}//${u.hostname}/*` : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // AI 服务实际请求的地址（Anthropic / Gemini 可以不填 Base URL）
+  const PROVIDER_DEFAULT_URLS = { anthropic: 'https://api.anthropic.com', gemini: 'https://generativelanguage.googleapis.com' };
+  const providerBaseUrl = (p) => p?.baseURL || PROVIDER_DEFAULT_URLS[p?.type] || '';
+
+  // 已授权的匹配模式。*:// 规则只授权了其中一种协议时（如 manifest 预先声明的 http://localhost），返回那一种。
+  // content script 中没有 chrome.permissions，只在扩展页面和后台使用
+  async function grantedPatterns(patterns) {
+    const has = (o) => chrome.permissions.contains({ origins: [o] });
+    const out = [];
+    for (const o of patterns) {
+      if (await has(o)) out.push(o);
+      else if (o.startsWith('*://')) for (const v of ['http' + o.slice(1), 'https' + o.slice(1)]) if (await has(v)) out.push(v);
+    }
+    return out;
+  }
+
+  // 完全没有授权的匹配模式
+  async function ungrantedOrigins(patterns) {
+    const out = [];
+    for (const o of patterns) if (!(await grantedPatterns([o])).length) out.push(o);
+    return out;
+  }
+
+  // ---------------------------------------------------------------------------
+  // 原文语言：BCP 47 代码（en、es、zh-Hant…）→ 各发音引擎的语言参数。空值视为英语
+  // ---------------------------------------------------------------------------
+  const TTS_LOCALES = {
+    en: 'en_US', es: 'es_ES', fr: 'fr_FR', de: 'de_DE', it: 'it_IT', pt: 'pt_BR', ru: 'ru_RU', ja: 'ja_JP', ko: 'ko_KR',
+    vi: 'vi_VN', th: 'th_TH', id: 'id_ID', ms: 'ms_MY', ar: 'ar_SA', he: 'he_IL', hi: 'hi_IN', tr: 'tr_TR', nl: 'nl_NL',
+    pl: 'pl_PL', sv: 'sv_SE', da: 'da_DK', fi: 'fi_FI', nb: 'nb_NO', el: 'el_GR', cs: 'cs_CZ', hu: 'hu_HU', ro: 'ro_RO', uk: 'uk_UA',
+  };
+
+  function normalizeLang(code) {
+    const [base = '', ...rest] = String(code || '').trim().replace(/_/g, '-').split('-');
+    const b = ({ iw: 'he', in: 'id', no: 'nb' })[base.toLowerCase()] || base.toLowerCase();
+    if (!/^[a-z]{2,3}$/.test(b) || b === 'und') return '';
+    if (b === 'zh') return /hant|tw|hk|mo/i.test(rest.join('-')) ? 'zh-TW' : 'zh-CN';
+    const region = rest.find((x) => /^[a-z]{2}$/i.test(x));
+    return region ? `${b}-${region.toUpperCase()}` : b;
+  }
+
+  const isEnglishLang = (code) => !normalizeLang(code) || normalizeLang(code).startsWith('en');
+
+  // Anki {{tts}} / [anki:tts] 的 lang 参数，如 es_ES、zh_CN
+  function ankiTtsLang(code) {
+    const n = normalizeLang(code) || 'en';
+    return n.includes('-') ? n.replace('-', '_') : TTS_LOCALES[n] || n;
+  }
+
+  // Google 在线发音的 tl 参数：中文区分简繁，其余只用语种
+  function googleTtsLang(code) {
+    const n = normalizeLang(code) || 'en';
+    return n.startsWith('zh') ? n : n.split('-')[0];
+  }
+
+  // ---------------------------------------------------------------------------
   // 动作图标：emoji / 文本、svg:名称（内置线条图标）、data:image/…（自定义图片）
   // ---------------------------------------------------------------------------
   const ICON_LIBRARY = {
@@ -676,7 +886,7 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
       page = u.origin + u.pathname + u.search;
     } catch {}
     const provider = cfg.providers.find((p) => p.id === action.providerId) || cfg.providers[0];
-    const signature = JSON.stringify([action.systemPrompt, action.prompt, action.outputSchema.map((f) => [f.name, f.description, f.fill]), provider?.model, cfg.general.targetLanguage]);
+    const signature = JSON.stringify([action.systemPrompt, action.prompt, action.outputSchema.map((f) => [f.name, f.description, f.fill]), provider?.model, cfg.general.targetLanguage, cfg.general.sourceLanguage]);
     return hashString([page, action.id, signature, context.selection, context.paragraphs].join('\u0001'));
   }
 
@@ -687,7 +897,7 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
 
   async function cachePut(key, patch) {
     const all = (await chrome.storage.local.get(CACHE_KEY))[CACHE_KEY] || {};
-    all[key] = { ...all[key], ...patch, time: Date.now() };
+    all[key] = { ...all[key], ...patch, time: patch.time ?? Date.now() };
     const keys = Object.keys(all);
     if (keys.length > CACHE_MAX) {
       keys.sort((a, b) => all[a].time - all[b].time).slice(0, keys.length - CACHE_MAX).forEach((k) => delete all[k]);
@@ -735,8 +945,6 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
     document.documentElement.lang = uiLang === 'en' ? 'en' : 'zh-CN';
   }
 
-  // 目标语言的常用选项（也可以直接输入其它语言）
-  const TARGET_LANGUAGES = ['简体中文', '繁體中文', 'English', '日本語', '한국어', 'Français', 'Deutsch', 'Español', 'Português', 'Italiano', 'Русский', 'Tiếng Việt', 'ไทย', 'Bahasa Indonesia', 'العربية'];
 
   const THEMES = {
     dusk: { name: '暮光 Dusk', badge: '#68769b', icon: 'icon.svg', png: '' },
@@ -802,6 +1010,9 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
     ankiThemeCss,
     UI_LANGUAGES,
     TARGET_LANGUAGES,
+    LANGUAGES,
+    langCode,
+    localizeBuiltins,
     setLang,
     lang: () => uiLang,
     t,
@@ -824,6 +1035,17 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
     stripThinking,
     patternMatches,
     sitePatternFromUrl,
+    ALL_SITES,
+    originPatternsForRule,
+    originPatterns,
+    originPatternForUrl,
+    providerBaseUrl,
+    grantedPatterns,
+    ungrantedOrigins,
+    normalizeLang,
+    isEnglishLang,
+    ankiTtsLang,
+    googleTtsLang,
     THEMES,
     themeOf,
     isSiteActive,

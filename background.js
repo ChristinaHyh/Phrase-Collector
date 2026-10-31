@@ -7,8 +7,12 @@ const tr = PC.t;
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   const res = await chrome.storage.local.get(PC.STORAGE_KEY);
   if (!res[PC.STORAGE_KEY]) await PC.saveConfig(PC.defaultConfig());
+  await syncContentScripts({ inject: true });
   if (reason === 'install') chrome.runtime.openOptionsPage();
+  // 从旧版（所有网站权限）升级后，白名单网站需要重新授权，打开设置页提示
+  else if (reason === 'update' && (await PC.ungrantedOrigins(PC.originPatterns(await PC.loadConfig()))).length) chrome.runtime.openOptionsPage();
 });
+chrome.runtime.onStartup.addListener(() => syncContentScripts());
 
 async function updateBadge(tabId, url) {
   try {
@@ -40,6 +44,9 @@ chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
 chrome.storage.onChanged.addListener((changes) => {
   if (!changes[PC.STORAGE_KEY]) return;
   updateActiveBadge();
+  const { oldValue, newValue } = changes[PC.STORAGE_KEY];
+  const sites = (c) => JSON.stringify([c?.general?.siteMode, c?.general?.whitelist]);
+  if (sites(oldValue) !== sites(newValue)) syncContentScripts({ inject: true });
   if (changes[PC.STORAGE_KEY].oldValue?.general?.theme !== changes[PC.STORAGE_KEY].newValue?.general?.theme) {
     applyThemeIcon();
     restyleManagedModels().catch(() => {}); // Anki 未打开时忽略，下次制卡时会再同步
@@ -47,12 +54,67 @@ chrome.storage.onChanged.addListener((changes) => {
 });
 
 // =============================================================================
+// 划词脚本：只注册到白名单中已经授权的网站（manifest 不再静态注入所有网站）
+// =============================================================================
+const CONTENT_SCRIPT = {
+  id: 'pc-content',
+  js: ['shared/default-prompts.js', 'shared/i18n.js', 'shared/core.js', 'content/content.js'],
+  runAt: 'document_idle',
+};
+let contentSync = Promise.resolve();
+
+function syncContentScripts(opts) {
+  contentSync = contentSync.then(() => doSyncContentScripts(opts)).catch(() => {});
+  return contentSync;
+}
+
+async function doSyncContentScripts({ inject = false } = {}) {
+  const cfg = await PC.loadConfig();
+  const matches = await PC.grantedPatterns(PC.originPatterns(cfg));
+  const [current] = await chrome.scripting.getRegisteredContentScripts({ ids: [CONTENT_SCRIPT.id] });
+  if (!matches.length) {
+    if (current) await chrome.scripting.unregisterContentScripts({ ids: [CONTENT_SCRIPT.id] });
+    return;
+  }
+  const changed = JSON.stringify(current?.matches || []) !== JSON.stringify(matches);
+  if (!current) await chrome.scripting.registerContentScripts([{ ...CONTENT_SCRIPT, matches }]);
+  else if (changed) await chrome.scripting.updateContentScripts([{ ...CONTENT_SCRIPT, matches }]);
+  if (inject && changed) await injectOpenTabs(cfg);
+}
+
+// 刚授权或刚加入白名单的网站不用刷新页面：把划词脚本注入到已打开的标签页（脚本自身会防止重复加载）
+async function injectOpenTabs(cfg) {
+  for (const tab of await chrome.tabs.query({})) {
+    if (tab.id == null || !tab.url || !PC.isSiteActive(cfg, tab.url)) continue;
+    try {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: CONTENT_SCRIPT.js });
+    } catch {
+      // 没有该网站的权限或页面不允许注入
+    }
+  }
+}
+
+chrome.permissions.onAdded.addListener(() => syncContentScripts({ inject: true }));
+chrome.permissions.onRemoved.addListener(() => syncContentScripts());
+
+// 自定义接口需要先在设置页授权：manifest 只预先声明了常用 AI 服务商、本机地址和发音服务
+async function ensureHostAccess(url, hint) {
+  const origin = PC.originPatternForUrl(url);
+  if (!origin || (await chrome.permissions.contains({ origins: [origin] }))) return;
+  throw new Error(tr('尚未授权访问 {host}。{hint}', { host: new URL(url).hostname, hint }));
+}
+
+const ensureProviderAccess = (provider) => ensureHostAccess(PC.providerBaseUrl(provider), tr('请在设置 → AI 服务中点击「测试连接」完成授权'));
+
+// =============================================================================
 // AI 调用（流式）
 // =============================================================================
 function buildPrompts(cfg, action, ctx) {
-  const vars = { ...ctx, targetLanguage: cfg.general.targetLanguage };
+  // sourceLanguage 只在设置里指定了原文语言时有值，自动识别时留空，由 AI 自行判断
+  const vars = { ...ctx, targetLanguage: cfg.general.targetLanguage, sourceLanguage: String(cfg.general.sourceLanguage || '').trim() };
   const aiFields = action.outputSchema.filter((f) => f.name && (f.fill || 'ai') === 'ai');
-  const keys = aiFields.map((f) => `- "${f.name}" (string): ${f.description || ''}`).join('\n');
+  // 字段说明里也可以用 {{targetLanguage}} 等变量
+  const keys = aiFields.map((f) => `- "${f.name}" (string): ${PC.renderTemplate(f.description || '', vars, { escape: false })}`).join('\n');
   const system =
     PC.renderTemplate(action.systemPrompt, vars, { escape: false }) +
     `\n\n## Output Format\nRespond with ONLY one valid JSON object — no markdown code fences, no text before or after it. ` +
@@ -130,6 +192,7 @@ async function streamAI(provider, system, user, { signal, onText, onThinking } =
     throw new Error(tr('AI 服务「{name}」未填写 API Key，请在设置 → AI 服务中填写', { name: provider.name }));
   }
   if (!provider.model) throw new Error(tr('AI 服务「{name}」未填写模型名称', { name: provider.name }));
+  await ensureProviderAccess(provider);
   const temperature = provider.temperature === '' || provider.temperature == null ? undefined : Number(provider.temperature);
   let full = '';
   const emit = (t) => {
@@ -265,6 +328,7 @@ const syncedModels = new Map(); // modelName -> 已同步模板的签名
 async function ankiRaw(cfg, action, params = {}, timeout = 15000) {
   const body = { action, version: 6, params };
   if (cfg.anki.apiKey) body.key = cfg.anki.apiKey;
+  await ensureHostAccess(cfg.anki.url || 'http://127.0.0.1:8765', tr('请在设置 → Anki 与发音中点击「测试连接」完成授权'));
   let res;
   try {
     res = await fetch(cfg.anki.url || 'http://127.0.0.1:8765', {
@@ -319,9 +383,8 @@ function ttsTag(cfg, field) {
 
 function resolveTts(cfg, action, tpl) {
   const field = action.anki.ttsField;
-  let tag = '';
-  if (field && cfg.anki.ttsMode === 'anki') tag = ttsTag(cfg, field);
-  else if (field && cfg.anki.ttsMode === 'audio') tag = `{{#Audio}}{{Audio}}{{/Audio}}{{^Audio}}${ttsTag(cfg, field)}{{/Audio}}`;
+  // Audio 字段里是在线音频，或非英语原文的 TTS 标签；为空时用模板里的英语 TTS
+  const tag = field && cfg.anki.ttsMode !== 'off' ? `{{#Audio}}{{Audio}}{{/Audio}}{{^Audio}}${ttsTag(cfg, field)}{{/Audio}}` : '';
   return tpl.replaceAll('[[TTS]]', tag);
 }
 
@@ -439,26 +502,36 @@ function highlight(html, term) {
   return found ? out : null;
 }
 
-function audioUrl(source, text) {
+// 非英语原文的 Anki TTS：模板里的 {{tts}} 只能固定一种语言，所以把带语言的 TTS 标签写进 Audio 字段
+function ttsMarkup(cfg, text, lang) {
+  const clean = PC.escapeHtml(String(text || '').replace(/[[\]]/g, ' ').replace(/\s+/g, ' ').trim());
+  if (!clean) return '';
+  const speed = Number(cfg.anki.ttsSpeed);
+  return `[anki:tts lang=${PC.ankiTtsLang(lang)}${speed && speed !== 1 ? ` speed=${speed}` : ''}]${clean}[/anki:tts]`;
+}
+
+function audioUrl(source, text, lang) {
   const q = encodeURIComponent(text);
+  // 有道只有英语发音，其他语言用 Google
+  if (!PC.isEnglishLang(lang)) return `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(PC.googleTtsLang(lang))}&q=${q}`;
   if (source === 'youdao-uk') return `https://dict.youdao.com/dictvoice?audio=${q}&type=1`;
   if (source === 'google') return `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q=${q}`;
   return `https://dict.youdao.com/dictvoice?audio=${q}&type=2`;
 }
 
-async function storeAudio(cfg, text) {
+async function storeAudio(cfg, text, lang) {
   const clean = String(text || '').replace(/\s+/g, ' ').trim();
   if (!clean || clean.length > 600) return '';
-  const source = cfg.anki.audioSource;
+  const source = PC.isEnglishLang(lang) ? cfg.anki.audioSource : 'google';
   if (source === 'google' && clean.length > 200) return '';
   try {
-    const res = await fetch(audioUrl(source, clean), { signal: AbortSignal.timeout(15000) });
+    const res = await fetch(audioUrl(source, clean, lang), { signal: AbortSignal.timeout(15000) });
     if (!res.ok) return '';
     const buf = new Uint8Array(await res.arrayBuffer());
     if (buf.length < 500) return '';
     let bin = '';
     for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
-    const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-1', new TextEncoder().encode(source + '|' + clean))))
+    const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-1', new TextEncoder().encode(source + '|' + (PC.isEnglishLang(lang) ? '' : PC.googleTtsLang(lang)) + '|' + clean))))
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('')
       .slice(0, 16);
@@ -488,7 +561,10 @@ async function addNote({ actionId, values, context, deck, allowDuplicate }) {
   formatted.SourceTitle ??= formatted.webTitle;
   formatted.SourceURL ??= formatted.webUrl;
   formatted.Audio = '';
-  if (cfg.anki.ttsMode === 'audio' && a.ttsField) formatted.Audio = await storeAudio(cfg, values[a.ttsField]);
+  const ttsText = a.ttsField ? PC.valueToString(values[a.ttsField]) : '';
+  const lang = context?.sourceLang;
+  if (ttsText && cfg.anki.ttsMode === 'audio') formatted.Audio = await storeAudio(cfg, ttsText, lang);
+  if (!formatted.Audio && ttsText && cfg.anki.ttsMode !== 'off' && !PC.isEnglishLang(lang)) formatted.Audio = ttsMarkup(cfg, ttsText, lang);
 
   let modelName;
   let fields = {};
@@ -549,6 +625,7 @@ async function testProvider(provider) {
 }
 
 async function listModels(provider) {
+  await ensureProviderAccess(provider);
   if (provider.type === 'anthropic') {
     const res = await fetch(joinUrl(provider.baseURL || 'https://api.anthropic.com', '/v1/models?limit=100'), {
       headers: { 'x-api-key': provider.apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
@@ -576,7 +653,9 @@ const handlers = {
   'anki:models': async () => (await anki(await PC.loadConfig(), 'modelNames')).sort((a, b) => a.localeCompare(b)),
   'anki:fields': async (m) => anki(await PC.loadConfig(), 'modelFieldNames', { modelName: m.modelName }),
   'anki:version': async () => anki(await PC.loadConfig(), 'version'),
-  'anki:browse':async (m) => anki(await PC.loadConfig(), 'guiBrowse', { query: `nid:${m.noteId}` }),
+  // 卡片可能已在 Anki 中删除：按笔记 ID 查找
+  'anki:noteExists': async (m) => (await anki(await PC.loadConfig(), 'findNotes', { query: `nid:${Number(m.noteId)}` })).length > 0,
+  'anki:browse': async (m) => anki(await PC.loadConfig(), 'guiBrowse', { query: `nid:${m.noteId}` }),
   'anki:test': async () => {
     const cfg = await PC.loadConfig();
     ankiPermissionGranted = false;

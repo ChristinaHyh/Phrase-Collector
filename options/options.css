@@ -527,3 +527,10 @@ details.action > summary .chip .pc-icon-svg, details.action > summary .chip .pc-
 .tb-btn .ic { display: grid; place-items: center; width: 16px; height: 16px; font-size: 14px; color: var(--accent); }
 .tb-btn kbd { font: 600 9.5px ui-monospace, Menlo, Consolas, monospace; color: var(--muted); border: 1px solid var(--line); border-radius: 5px; padding: 1px 4px; }
 .cache-info { font-size: 12px; color: var(--muted); }
+
+/* 白名单网站未授权提示 */
+.perm-note:empty { display: none; }
+.perm-note { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 12px 10px 14px; border-radius: 12px; font-size: 12.5px; line-height: 1.6; color: var(--fg-2); background: var(--banner); border: 1px solid var(--banner-line); }
+.perm-note > svg { flex: none; width: 16px; height: 16px; fill: none; stroke: var(--danger); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.perm-note > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.perm-note > button { flex: none; }

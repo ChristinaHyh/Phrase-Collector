@@ -114,7 +114,7 @@ globalThis.PC_I18N_EN = {
 
   // 通用
   界面语言: 'Language',
-  '设置页、划词面板、工具栏弹窗的显示语言。不影响 AI 输出的语言（见下方「目标语言」）。': 'Display language of the settings page, result panel and popup. It does not change the language of AI output (see “Target language” below).',
+  '设置页、划词面板、工具栏弹窗的显示语言。不影响 AI 输出的语言（见下方「解释语言」）。': 'Display language of the settings page, result panel and popup. It does not change the language of AI output (see “Explanation language” below).',
   主题: 'Theme',
   '纸白 · 墨蓝 · 粉蓝紫点缀': 'Paper white · ink blue · blush, sky and lavender accents',
   '浅苔 · 湖绿 · 金色点缀': 'Pale moss · lagoon green · gold accents',
@@ -146,8 +146,12 @@ globalThis.PC_I18N_EN = {
   清除缓存: 'Clear cache',
   '同一页面、同一动作、同一选区（及所在段落）再次划选时不再请求 AI，节省 Token。修改提示词、输出字段或模型后自动失效；面板右上角的「重新生成」会跳过缓存。':
     'Selecting the same text (in the same paragraph) on the same page with the same action reuses the result instead of calling the AI, saving tokens. The cache is invalidated when you change the prompts, output fields or model; “Regenerate” at the top right of the panel skips it.',
-  目标语言: 'Target language',
-  '提示词中的 <code>{{targetLanguage}}</code> 变量。可从列表中选择常用语言，也可以直接输入。': 'The <code>{{targetLanguage}}</code> variable in prompts. Pick a common language from the list or type any other.',
+  原文语言: 'Source language',
+  自动识别: 'Auto-detect',
+  '你阅读的文字是什么语言，用于朗读、Anki 发音和 AI 解析。默认自动识别：发音语言由浏览器按选中文字识别，AI 自行判断原文语言。只读一种语言、或自动识别不准时再指定。对应提示词变量 <code>{{sourceLanguage}}</code>，自动识别时为空。':
+    'The language of the text you read, used for read-aloud, Anki audio and the AI analysis. By default it is detected automatically: the browser detects the audio language from the selected text, and the AI identifies the language itself. Set it if you only read one language or detection gets it wrong. This is the <code>{{sourceLanguage}}</code> prompt variable, empty when auto-detecting.',
+  解释语言: 'Explanation language',
+  'AI 写解释和翻译时用的语言，一般选你的母语。内置动作没改动过的提示词、面板布局和卡片标签也会换成这种语言（列表外的语言用英文版）。对应提示词变量 <code>{{targetLanguage}}</code>，可从列表中选择，也可以直接输入。': 'The language AI uses for explanations and translations, usually your native language. Unmodified prompts, panel layouts and card labels of the built-in actions switch to this language too (languages not in the list use the English version). This is the <code>{{targetLanguage}}</code> prompt variable. Pick one from the list or type any other.',
   上下文长度: 'Context length',
   '<code>{{paragraphs}}</code> 最多截取的字符数。': 'Maximum number of characters for <code>{{paragraphs}}</code>.',
 
@@ -282,8 +286,6 @@ globalThis.PC_I18N_EN = {
   不发音: 'No audio',
   'Anki 内置 TTS 在电脑版和 AnkiDroid 上使用系统语音；AnkiMobile/AnkiWeb 不支持时可选“在线音频”。修改后点击下方“同步模板”生效于已有卡片。':
     'Anki’s built-in TTS uses system voices on desktop and AnkiDroid; choose “Online audio” if AnkiMobile/AnkiWeb doesn’t support it. After changing this, click “Sync templates to Anki” below to update existing cards.',
-  语言: 'Language',
-  'Anki TTS 语言代码，如 <code>en_US</code>、<code>en_GB</code>。': 'Anki TTS language code, e.g. <code>en_US</code>, <code>en_GB</code>.',
   指定语音: 'Voices',
   '留空使用系统默认，如 Microsoft_Aria,Apple_Samantha': 'Leave empty for the system default, e.g. Microsoft_Aria,Apple_Samantha',
   '多个用逗号分隔，按顺序选用第一个可用的。可在 Anki 卡片模板编辑器中输入 <code>{{tts-voices:}}</code> 查看可用语音。': 'Comma-separated; the first available one is used. Enter <code>{{tts-voices:}}</code> in Anki’s card template editor to list available voices.',
@@ -342,4 +344,23 @@ globalThis.PC_I18N_EN = {
   '笔记类型「{model}」缺少字段 {field}，且无法自动添加（{error}）。请升级 AnkiConnect 或在 Anki 中手动添加': 'Note type “{model}” is missing field {field} and it could not be added automatically ({error}). Please update AnkiConnect or add it in Anki manually.',
   '请在设置中选择要使用的 Anki 笔记类型': 'Please choose an Anki note type in the settings',
   请在设置中为笔记类型配置字段映射: 'Please set up the field mapping for the note type in the settings',
+
+  // 网站授权
+  '尚未授权访问 {host}。{hint}': 'No access to {host} yet. {hint}',
+  '请在设置 → AI 服务中点击「测试连接」完成授权': 'Click “Test connection” under Settings → AI providers to grant access.',
+  '请在设置 → Anki 与发音中点击「测试连接」完成授权': 'Click “Test connection” under Settings → Anki & audio to grant access.',
+  '以下网站还没有授权，划词不会生效：{list}': 'Access not granted yet, so selection actions won’t work on: {list}',
+  授权: 'Grant access',
+  '插件只在白名单网站上运行。新加入的网站需要点「授权」，在浏览器弹出的提示中允许访问；正则规则无法对应到具体网站，需要授权访问所有网站。':
+    'The extension runs only on whitelisted sites. For a newly added site, click “Grant access” and allow it in the browser prompt. Regex rules can’t be mapped to specific sites and need access to all sites.',
+  '未获得授权，划词不会生效': 'Access not granted. Selection actions won’t work here.',
+  '“所有网站”模式需要授权访问所有网站': '“All sites” mode needs access to all sites',
+  授权所有网站: 'Grant access to all sites',
+  '已在白名单中，但还没有授权访问此网站': 'On the whitelist, but access to this site hasn’t been granted',
+  授权此网站: 'Grant access to this site',
+  // 多语言发音
+  '用于英语原文。有道只有英语发音，其他语言自动使用 Google 翻译发音。': 'Used for English text. Youdao only has English audio, so other languages use Google Translate audio.',
+  英语口音: 'English accent',
+  '英语原文使用的 Anki TTS 语言代码，如 <code>en_US</code>、<code>en_GB</code>。其他语言按划词时识别出的原文语言自动选择，例如西班牙语使用 <code>es_ES</code>。':
+    'Anki TTS language code for English text, such as <code>en_US</code> or <code>en_GB</code>. Other languages are picked automatically from the language detected in the selection, for example <code>es_ES</code> for Spanish.',
 };

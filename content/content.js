@@ -328,7 +328,26 @@ kbd{font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-
       paragraphs: getParagraphs(info.range, info.text),
       webTitle: document.title,
       webUrl: location.href,
+      // 设置里指定了原文语言时直接使用；否则先用网页声明的语言，识别结果出来后替换
+      sourceLang: fixedSourceLang() || PC.normalizeLang(document.documentElement.lang),
     };
+  }
+
+  const fixedSourceLang = () => PC.langCode(cfg?.general.sourceLanguage);
+
+  // 原文语言（用于朗读和 Anki 发音）：优先识别选中文字，太短识别不准时用所在段落
+  async function detectSourceLang(context) {
+    if (fixedSourceLang()) return '';
+    for (const text of [context.selection, context.paragraphs]) {
+      try {
+        const res = await chrome.i18n.detectLanguage(text);
+        const lang = res?.isReliable && PC.normalizeLang(res.languages?.[0]?.language);
+        if (lang) return lang;
+      } catch {
+        // 扩展已失效或接口不可用时保留网页声明的语言
+      }
+    }
+    return '';
   }
 
   // ---------------------------------------------------------------------------
@@ -444,6 +463,9 @@ kbd{font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-
     ensureRoot();
     closePanel();
     const context = buildContext(info);
+    detectSourceLang(context).then((lang) => {
+      if (lang) context.sourceLang = lang;
+    });
     const ui = {};
     const provider = cfg?.providers.find((p) => p.id === action.providerId) || cfg?.providers[0];
     ui.pin = el('button', { title: tr('固定（点击页面其它位置不关闭）'), 'aria-pressed': 'false', onclick: () => ui.pin.setAttribute('aria-pressed', ui.pin.classList.toggle('on')) }, icon('pin'));
@@ -505,9 +527,24 @@ kbd{font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-
         if (hit.noteId) {
           r.added = true;
           r.noteId = hit.noteId;
+          verifyNote(r);
         }
         finish(r, hit.text);
       });
+  }
+
+  // 缓存里记着「已添加」，但卡片可能已在 Anki 中删除：确认笔记仍存在，否则恢复为未添加。
+  // Anki 未打开等无法确认的情况保持原状
+  function verifyNote(r) {
+    const noteId = r.noteId;
+    send({ type: 'anki:noteExists', noteId }, (res) => {
+      if (!res?.ok || res.data !== false || run !== r || r.noteId !== noteId) return;
+      r.added = false;
+      r.noteId = null;
+      if (r.cacheKey) PC.cachePut(r.cacheKey, { noteId: null, time: r.fromCache.time }).catch(() => {});
+      refreshAddButton(r);
+      if (r.done) showCacheNote(r);
+    });
   }
 
   function generate(r) {
@@ -857,7 +894,9 @@ kbd{font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-
     const text = PC.valueToString((run.values || currentValues(run).values)[field]) || run.context.selection;
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = (cfg?.anki.ttsLang || 'en_US').replace('_', '-');
+    // 英语用设置里的口音（en_US / en_GB），其他语言按识别出的原文语言
+    const lang = run.context.sourceLang;
+    u.lang = (PC.isEnglishLang(lang) ? cfg?.anki.ttsLang || 'en_US' : PC.ankiTtsLang(lang)).replace('_', '-');
     u.rate = Number(cfg?.anki.ttsSpeed) || 1;
     speechSynthesis.speak(u);
   }

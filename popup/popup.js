@@ -2,6 +2,8 @@ const $ = (id) => document.getElementById(id);
 const tr = PC.t;
 let cfg;
 let tab;
+let missing = []; // 当前网页还没授权的匹配模式
+let denied = false; // 刚才的授权请求被拒绝
 
 function hostPatternsFor(url) {
   // 白名单中直接匹配当前网址的条目
@@ -15,6 +17,26 @@ function setCheck(id, cls, html) {
   el.querySelectorAll('a[data-options]').forEach((a) => a.addEventListener('click', () => chrome.runtime.openOptionsPage()));
 }
 
+// 当前网页生效需要的授权：所有网站模式要 *://*/*，否则是匹配这个网址的白名单规则对应的网站
+function originsForTab() {
+  if (cfg.general.siteMode === 'all') return [PC.ALL_SITES];
+  return [...new Set(hostPatternsFor(tab?.url || '').flatMap(PC.originPatternsForRule))];
+}
+
+async function refresh() {
+  missing = PC.isSiteActive(cfg, tab?.url || '') ? await PC.ungrantedOrigins(originsForTab()) : [];
+  render();
+}
+
+// 必须在点击事件中直接调用（浏览器要求用户手势）。弹窗可能在授权提示出现时关闭，后续由后台完成脚本注册
+async function requestOrigins(origins) {
+  try {
+    return await chrome.permissions.request({ origins });
+  } catch {
+    return false;
+  }
+}
+
 function render() {
   PC.localize();
   const theme = PC.themeOf(cfg);
@@ -25,7 +47,7 @@ function render() {
   let host = '';
   try {
     const u = new URL(url);
-    host = /^(https?|file):$/.test(u.protocol) ? u.hostname || u.protocol : '';
+    host = /^https?:$/.test(u.protocol) ? u.hostname : '';
   } catch {}
   $('host').textContent = host || tr('此页面不支持划词');
   const btn = $('toggleSite');
@@ -41,8 +63,20 @@ function render() {
     state.textContent = tr('插件已停用');
     btn.style.display = 'none';
   } else if (cfg.general.siteMode === 'all') {
-    state.textContent = tr('当前为“所有网站”模式，已生效');
-    btn.style.display = 'none';
+    if (missing.length) {
+      state.textContent = denied ? tr('未获得授权，划词不会生效') : tr('“所有网站”模式需要授权访问所有网站');
+      state.className = 'state';
+      btn.textContent = tr('授权所有网站');
+      btn.className = 'primary';
+    } else {
+      state.textContent = tr('当前为“所有网站”模式，已生效');
+      btn.style.display = 'none';
+    }
+  } else if (on && missing.length) {
+    state.textContent = denied ? tr('未获得授权，划词不会生效') : tr('已在白名单中，但还没有授权访问此网站');
+    state.className = 'state';
+    btn.textContent = tr('授权此网站');
+    btn.className = 'primary';
   } else if (on) {
     state.textContent = tr('✓ 已在白名单中，划词生效');
     btn.textContent = tr('移出白名单');
@@ -101,19 +135,28 @@ async function checkAnki() {
 $('enabled').addEventListener('change', async () => {
   cfg.general.enabled = $('enabled').checked;
   await PC.saveConfig(cfg);
-  render();
+  refresh();
 });
 
 $('toggleSite').addEventListener('click', async () => {
   const url = tab.url;
-  if (PC.isSiteActive(cfg, url)) {
+  if (missing.length) {
+    // 已在白名单（或所有网站模式），只差授权
+    denied = !(await requestOrigins(missing));
+  } else if (PC.isSiteActive(cfg, url)) {
     const matched = hostPatternsFor(url);
     cfg.general.whitelist = cfg.general.whitelist.filter((p) => !matched.includes(p));
+    await PC.saveConfig(cfg);
   } else {
-    cfg.general.whitelist.push(PC.sitePatternFromUrl(url) || new URL(url).hostname || url);
+    const rule = PC.sitePatternFromUrl(url) || new URL(url).hostname;
+    cfg.general.whitelist.push(rule);
+    // 先发起保存再请求授权：授权提示弹出时弹窗可能被关闭，白名单仍会保存
+    const saving = PC.saveConfig(cfg);
+    const granted = await requestOrigins(PC.originPatternsForRule(rule));
+    await saving;
+    denied = !granted;
   }
-  await PC.saveConfig(cfg);
-  render();
+  refresh();
 });
 
 $('openOptions').addEventListener('click', () => chrome.runtime.openOptionsPage());
@@ -121,6 +164,6 @@ $('openOptions').addEventListener('click', () => chrome.runtime.openOptionsPage(
 (async () => {
   [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   cfg = await PC.loadConfig();
-  render();
+  await refresh();
   checkAnki();
 })();

@@ -52,6 +52,17 @@ function send(type, payload = {}) {
   });
 }
 
+// 申请网站授权。必须在点击等用户操作中直接调用，且调用前不能有 await（浏览器要求用户手势）
+async function requestOrigins(origins) {
+  const list = origins.filter(Boolean);
+  if (!list.length) return true;
+  try {
+    return await chrome.permissions.request({ origins: list });
+  } catch {
+    return false;
+  }
+}
+
 // 绑定控件
 function input(obj, key, { type = 'text', placeholder = '', onchange, oninput, cls } = {}) {
   const el = h('input', { type, placeholder, value: obj[key] ?? '', class: cls });
@@ -429,9 +440,34 @@ function toolbarStylePicker() {
 // =============================================================================
 // 通用
 // =============================================================================
+// 白名单网站的授权状态：没授权的网站不会注入划词脚本
+let permNote = null;
+function sitePermissionNote() {
+  const box = h('div', { class: 'perm-note' });
+  let timer;
+  box.refresh = () => {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      const missing = await PC.ungrantedOrigins(PC.originPatterns(cfg));
+      if (!missing.length) return box.replaceChildren();
+      const names = missing.map((o) => (o === PC.ALL_SITES ? tr('所有网站') : o.replace(/^\*:\/\//, '').replace(/\/\*$/, '')));
+      box.replaceChildren(
+        svgIcon(ICON_PATHS.alert),
+        h('span', {}, tr('以下网站还没有授权，划词不会生效：{list}', { list: names.join(tr('、')) })),
+        h('button', { class: 'small primary', onclick: () => requestOrigins(missing).then(box.refresh) }, tr('授权'))
+      );
+    }, 200);
+  };
+  box.refresh();
+  return box;
+}
+chrome.permissions.onAdded.addListener(() => permNote?.refresh());
+chrome.permissions.onRemoved.addListener(() => permNote?.refresh());
+
 function renderGeneral() {
   const c = content('general');
   const g = cfg.general;
+  permNote = sitePermissionNote();
   const cacheInfo = h('span', { class: 'cache-info' });
   const refreshCacheInfo = async () => {
     try {
@@ -447,6 +483,7 @@ function renderGeneral() {
   wl.addEventListener('input', () => {
     g.whitelist = wl.value.split('\n').map((s) => s.trim()).filter(Boolean);
     save();
+    permNote.refresh();
   });
   // 粘贴网址时自动转换为通用域名，例如 https://www.nytimes.com/2026/… → *.nytimes.com
   wl.addEventListener('paste', (e) => {
@@ -478,22 +515,32 @@ function renderGeneral() {
           PC.setLang(v);
           renderAll();
         }),
-        helpHtml(tr('设置页、划词面板、工具栏弹窗的显示语言。不影响 AI 输出的语言（见下方「目标语言」）。'))
+        helpHtml(tr('设置页、划词面板、工具栏弹窗的显示语言。不影响 AI 输出的语言（见下方「解释语言」）。'))
       ),
       row(tr('主题'), themePicker(), helpHtml(tr('同时作用于划词面板、设置页、工具栏弹窗、图标和 Anki 卡片。'))),
       row(tr('启用插件'), checkbox(g, 'enabled', tr('启用划词'))),
       row(
         tr('生效范围'),
-        select(g, 'siteMode', [
-          ['whitelist', tr('仅白名单网站')],
-          ['all', tr('所有网站')],
-        ])
+        select(
+          g,
+          'siteMode',
+          [
+            ['whitelist', tr('仅白名单网站')],
+            ['all', tr('所有网站')],
+          ],
+          (v) => (v === 'all' ? requestOrigins([PC.ALL_SITES]).then(permNote.refresh) : permNote.refresh())
+        )
       ),
       row(
         tr('白名单'),
-        wl,
-        helpHtml(
-          tr('每行一条。直接粘贴网址会自动转换为 <code>*.域名</code>。<code>*.example.com</code> 或 <code>example.com</code> 匹配该域名及全部子域名；<code>https://x.com/*/status/*</code> 通配符匹配完整网址；<code>/regex/</code> 正则匹配。以 <code>#</code> 开头的行会被忽略。')
+        h('div', {}, wl, permNote),
+        h(
+          'div',
+          {},
+          helpHtml(
+            tr('每行一条。直接粘贴网址会自动转换为 <code>*.域名</code>。<code>*.example.com</code> 或 <code>example.com</code> 匹配该域名及全部子域名；<code>https://x.com/*/status/*</code> 通配符匹配完整网址；<code>/regex/</code> 正则匹配。以 <code>#</code> 开头的行会被忽略。')
+          ),
+          helpHtml(tr('插件只在白名单网站上运行。新加入的网站需要点「授权」，在浏览器弹出的提示中允许访问；正则规则无法对应到具体网站，需要授权访问所有网站。'))
         )
       ),
       row(
@@ -528,9 +575,34 @@ function renderGeneral() {
         helpHtml(tr('同一页面、同一动作、同一选区（及所在段落）再次划选时不再请求 AI，节省 Token。修改提示词、输出字段或模型后自动失效；面板右上角的「重新生成」会跳过缓存。'))
       ),
       row(
-        tr('目标语言'),
-        combo(input(g, 'targetLanguage', { placeholder: '简体中文' }), () => PC.TARGET_LANGUAGES),
-        helpHtml(tr('提示词中的 <code>{{targetLanguage}}</code> 变量。可从列表中选择常用语言，也可以直接输入。'))
+        tr('原文语言'),
+        combo(
+          input(g, 'sourceLanguage', {
+            placeholder: tr('自动识别'),
+            // 列表里的「自动识别」对应空值
+            oninput: (el) => {
+              if (el.value === tr('自动识别')) el.value = g.sourceLanguage = '';
+            },
+          }),
+          () => [tr('自动识别'), ...PC.TARGET_LANGUAGES]
+        ),
+        helpHtml(tr('你阅读的文字是什么语言，用于朗读、Anki 发音和 AI 解析。默认自动识别：发音语言由浏览器按选中文字识别，AI 自行判断原文语言。只读一种语言、或自动识别不准时再指定。对应提示词变量 <code>{{sourceLanguage}}</code>，自动识别时为空。'))
+      ),
+      row(
+        tr('解释语言'),
+        combo(
+          input(g, 'targetLanguage', {
+            placeholder: '简体中文',
+            // 内置动作未改动过的提示词、面板布局和卡片模板换成对应语言的版本
+            onchange: () => {
+              PC.localizeBuiltins(cfg);
+              save();
+              renderActions();
+            },
+          }),
+          () => PC.TARGET_LANGUAGES
+        ),
+        helpHtml(tr('AI 写解释和翻译时用的语言，一般选你的母语。内置动作没改动过的提示词、面板布局和卡片标签也会换成这种语言（列表外的语言用英文版）。对应提示词变量 <code>{{targetLanguage}}</code>，可从列表中选择，也可以直接输入。'))
       ),
       row(tr('上下文长度'), input(g, 'maxContextChars', { type: 'number' }), helpHtml(tr('<code>{{paragraphs}}</code> 最多截取的字符数。')))
     )
@@ -548,6 +620,8 @@ function renderProviders() {
     const eye = h('button', { class: 'small', onclick: () => (key.type = key.type === 'password' ? 'text' : 'password') }, tr('显示'));
     const fetchModels = async () => {
       res.set(tr('正在获取模型列表…'));
+      // 自定义接口地址需要授权（常用服务商已在安装时授权，不会弹出提示）
+      await requestOrigins([PC.originPatternForUrl(PC.providerBaseUrl(p))]);
       try {
         const list = await send('ai:models', { provider: p });
         modelLists.set(p.id, list);
@@ -605,6 +679,7 @@ function renderProviders() {
               class: 'primary',
               onclick: async () => {
                 res.set(tr('正在测试…'));
+                await requestOrigins([PC.originPatternForUrl(PC.providerBaseUrl(p))]);
                 try {
                   const r = await send('ai:test', { provider: p });
                   res.set(tr(r.json ? '连接成功，JSON 输出正常：{reply}' : '连接成功（但未返回 JSON，建议开启 JSON 模式）：{reply}', { reply: r.reply }), true);
@@ -682,7 +757,7 @@ function renderActions() {
       'div',
       { class: 'intro' },
       h('p', {}, tr('每个动作会把划选内容连同上下文发给 AI，按「输出字段」返回 JSON，再用「面板布局」渲染出来，并可一键写入 Anki。')),
-      h('div', { class: 'vars' }, h('span', {}, tr('提示词变量')), ['selection', 'paragraphs', 'webTitle', 'webUrl', 'targetLanguage'].map((v) => h('code', {}, `{{${v}}}`)))
+      h('div', { class: 'vars' }, h('span', {}, tr('提示词变量')), ['selection', 'paragraphs', 'webTitle', 'webUrl', 'sourceLanguage', 'targetLanguage'].map((v) => h('code', {}, `{{${v}}}`)))
     )
   );
   cfg.actions.forEach((a, idx) => c.append(actionCard(a, idx)));
@@ -896,7 +971,7 @@ function actionCard(a, idx) {
             {
               onclick: async () => {
                 if (!(await confirmDialog(tr('将「{name}」恢复为默认设置？', { name: a.name }), tr('提示词、输出字段、面板布局和卡片模板会恢复默认，牌组与快捷键会保留。'), { ok: tr('恢复默认') }))) return;
-                const def = PC.builtinDefaults(a.builtin);
+                const def = PC.builtinDefaults(a.builtin, cfg.general.targetLanguage);
                 cfg.actions[idx] = { ...def, id: a.id, enabled: a.enabled, shortcut: a.shortcut, providerId: a.providerId, anki: { ...def.anki, deck: a.anki.deck } };
                 save();
                 renderActions();
@@ -1095,7 +1170,7 @@ function managedModelBlock(a, fieldNames) {
         'button',
         {
           onclick: () => {
-            const def = a.builtin ? PC.builtinDefaults(a.builtin).anki : { front: '', back: '', css: '' };
+            const def = a.builtin ? PC.builtinDefaults(a.builtin, cfg.general.targetLanguage).anki : { front: '', back: '', css: '' };
             Object.assign(a.anki, { front: def.front, back: def.back, css: def.css });
             save();
             renderActions();
@@ -1208,7 +1283,8 @@ function renderAnki() {
       ['youdao-us', tr('有道 美音')],
       ['youdao-uk', tr('有道 英音')],
       ['google', tr('Google 翻译（≤200 字符）')],
-    ])
+    ]),
+    helpHtml(tr('用于英语原文。有道只有英语发音，其他语言自动使用 Google 翻译发音。'))
   );
   const toggleAudio = () => (audioRow.style.display = k.ttsMode === 'audio' ? '' : 'none');
   c.append(
@@ -1227,6 +1303,7 @@ function renderAnki() {
             class: 'primary',
             onclick: async () => {
               res.set(tr('正在连接…（首次连接时请在 Anki 弹出的授权窗口中点击 Yes）'));
+              await requestOrigins([PC.originPatternForUrl(k.url || 'http://127.0.0.1:8765')]);
               try {
                 const r = await send('anki:test');
                 res.set(tr('连接成功，AnkiConnect 版本 {version}', { version: r.version }), true);
@@ -1259,7 +1336,7 @@ function renderAnki() {
         ),
         helpHtml(tr('Anki 内置 TTS 在电脑版和 AnkiDroid 上使用系统语音；AnkiMobile/AnkiWeb 不支持时可选“在线音频”。修改后点击下方“同步模板”生效于已有卡片。'))
       ),
-      row(tr('语言'), input(k, 'ttsLang', { placeholder: 'en_US' }), helpHtml(tr('Anki TTS 语言代码，如 <code>en_US</code>、<code>en_GB</code>。'))),
+      row(tr('英语口音'), input(k, 'ttsLang', { placeholder: 'en_US' }), helpHtml(tr('英语原文使用的 Anki TTS 语言代码，如 <code>en_US</code>、<code>en_GB</code>。其他语言按划词时识别出的原文语言自动选择，例如西班牙语使用 <code>es_ES</code>。'))),
       row(tr('指定语音'), input(k, 'ttsVoices', { placeholder: tr('留空使用系统默认，如 Microsoft_Aria,Apple_Samantha') }), helpHtml(tr('多个用逗号分隔，按顺序选用第一个可用的。可在 Anki 卡片模板编辑器中输入 <code>{{tts-voices:}}</code> 查看可用语音。'))),
       row(tr('语速'), input(k, 'ttsSpeed', { type: 'number' })),
       audioRow,
