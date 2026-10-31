@@ -164,7 +164,7 @@ globalThis.PC_I18N_EN = {
   接口类型: 'API type',
   'OpenAI 兼容（DeepSeek / OpenAI / OpenRouter / 硅基流动 / Kimi / 通义 / 智谱 / Ollama …）': 'OpenAI-compatible (DeepSeek / OpenAI / OpenRouter / SiliconFlow / Kimi / Qwen / Zhipu / Ollama …)',
   'OpenAI 兼容接口会自动拼接 <code>/chat/completions</code>。': 'For OpenAI-compatible APIs, <code>/chat/completions</code> is appended automatically.',
-  '只保存在本机浏览器中，仅用于直接请求上面的接口。': 'Stored only in this browser and sent only to the API above.',
+  '只保存在本机浏览器中，仅用于直接请求上面的接口。本机或局域网里的模型（如 Ollama）可以留空。': 'Stored only in this browser and sent only to the API above. Leave it empty for a model on your computer or local network, such as Ollama.',
   模型: 'Model',
   获取模型列表: 'Fetch models',
   留空使用模型默认值: 'Leave empty for the model default',
@@ -319,6 +319,8 @@ globalThis.PC_I18N_EN = {
   // ---------------------------------------------------------------------------
   '请求参数有误（若提示 response_format，请在 AI 服务里关闭“JSON 模式”）': 'Bad request (if it mentions response_format, turn off “JSON mode” for the AI provider)',
   'API Key 无效或未填写': 'Invalid or missing API key',
+  '本机 AI 服务拒绝了请求。如果选的是 Ollama 云端模型（名称以 -cloud 结尾），请先在终端运行 ollama signin 登录，或改用本地模型': 'The local AI service refused the request. If you picked an Ollama cloud model (name ending in -cloud), run ollama signin in a terminal first, or use a local model',
+  本机模型无需填写: 'Not needed for local models',
   账户余额不足: 'Insufficient account balance',
   无访问权限: 'Access denied',
   接口地址或模型名称不存在: 'API URL or model name not found',

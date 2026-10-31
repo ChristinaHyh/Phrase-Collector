@@ -339,7 +339,8 @@ function content(id) {
 // =============================================================================
 function renderWelcome() {
   const w = document.getElementById('welcome');
-  const noKey = !cfg.providers.some((p) => p.apiKey);
+  // 本机模型（如 Ollama）不需要 API Key
+  const noKey = !cfg.providers.some((p) => p.apiKey || !PC.needsApiKey(p));
   const noSite = cfg.general.siteMode === 'whitelist' && !cfg.general.whitelist.some((s) => s.trim());
   if (!noKey && !noSite) return w.replaceChildren();
   w.replaceChildren(
@@ -616,7 +617,7 @@ function renderProviders() {
   const c = content('providers');
   cfg.providers.forEach((p, idx) => {
     const res = resultLine();
-    const key = input(p, 'apiKey', { type: 'password', placeholder: 'sk-...' });
+    const key = input(p, 'apiKey', { type: 'password', placeholder: PC.needsApiKey(p) ? 'sk-...' : tr('本机模型无需填写') });
     const eye = h('button', { class: 'small', onclick: () => (key.type = key.type === 'password' ? 'text' : 'password') }, tr('显示'));
     const fetchModels = async () => {
       res.set(tr('正在获取模型列表…'));
@@ -647,8 +648,15 @@ function renderProviders() {
             ['gemini', 'Google Gemini'],
           ])
         ),
-        row('Base URL', input(p, 'baseURL', { placeholder: 'https://api.deepseek.com' }), helpHtml(tr('OpenAI 兼容接口会自动拼接 <code>/chat/completions</code>。'))),
-        row('API Key', h('div', { class: 'inline' }, key, eye), helpHtml(tr('只保存在本机浏览器中，仅用于直接请求上面的接口。'))),
+        row(
+          'Base URL',
+          input(p, 'baseURL', {
+            placeholder: 'https://api.deepseek.com',
+            oninput: () => (key.placeholder = PC.needsApiKey(p) ? 'sk-...' : tr('本机模型无需填写')),
+          }),
+          helpHtml(tr('OpenAI 兼容接口会自动拼接 <code>/chat/completions</code>。'))
+        ),
+        row('API Key', h('div', { class: 'inline' }, key, eye), helpHtml(tr('只保存在本机浏览器中，仅用于直接请求上面的接口。本机或局域网里的模型（如 Ollama）可以留空。'))),
         row(
           tr('模型'),
           h(

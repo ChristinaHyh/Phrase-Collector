@@ -39,7 +39,7 @@ Phrase Collector 是一个 Chrome 扩展，面向阅读外语材料的学习者�
 - **省 Token 的结果缓存**：在同一页面再次划选同一内容（同一段落）时，直接显示上次的结果，不再请求 AI；已经加入 Anki 的会显示「已添加」，如果卡片已在 Anki 中删除，会恢复为可以再次添加。点「重新生成」可以跳过缓存。修改提示词、输出字段或模型后，旧缓存自动失效。
 - **可定制的外观**：划词按钮有 Standard（图标 + 名称 + 快捷键）和 Lite（只显示图标）两种样式；每个动作的图标可以从线条图标库或 Emoji 中挑选，也可以输入文字或上传图片。
 - **中英文界面**：在「通用与白名单 → 界面语言」中切换中文 / English，设置页、划词面板、弹窗和错误提示都会跟着切换。AI 解释所用的语言由「解释语言」单独控制，内置动作和自定义动作都会使用它，可以从常用语言中选择，也可以直接输入。
-- **原文语言与解释语言**：原文语言默认自动识别，也可以在「通用与白名单 → 原文语言」中固定为一种语言，用于朗读、卡片发音和 AI 解析。切换解释语言时，内置动作没改动过的提示词、面板布局和卡片标签会一起换成对应语言：提示词有中文和英文版，面板和卡片标签支持列表中的 8 种语言（中文、English、日本語、Español、Deutsch、Français、Русский、Italiano），其他语言用英文版。
+- **原文语言与解释语言**：原文语言默认自动识别，也可以在「通用与白名单 → 原文语言」中固定为一种语言，用于朗读、卡片发音和 AI 解析。切换解释语言时，内置动作没改动过的提示词、面板布局和卡片标签会一起换成对应语言：提示词有中文和英文版，面板和卡片标签支持列表中的 8 种语言（中文、English、日本語、Español、Deutsch、Français、Русский、Italiano），其他语言用英文版。你改过的部分保持不变。
 - **两套主题**：暮光 Dusk（雾蓝、粉、天蓝、紫）和湖光 Lagoon（湖绿、苔绿、金），同时作用于划词面板、设置页、弹窗、工具栏图标和 Anki 卡片。
 - **备份与迁移**：可以导出、导入配置（默认不含 API Key），也可以导入 Read Frog 配置中的自定义动作。
 
@@ -117,7 +117,7 @@ Edge、Brave 等基于 Chromium 的浏览器也可以用同样的方式安装。
 - **划词没有反应**：点工具栏图标，确认当前网站已在白名单中并已授权（未授权时会显示「授权此网站」按钮）。如果图标上有 `ON` 仍然没反应，刷新一下页面。Chrome 内置的 PDF 阅读器、`chrome://` 页面和应用商店页面无法注入脚本。
 - **报 HTTP 400，并提到 response_format**：这个服务不支持 JSON 模式，在「AI 服务」中关闭「JSON 模式」即可。
 - **推理模型**（如 `deepseek-reasoner`）：可以使用，生成前面板会显示「模型思考中…」。Temperature 建议留空。
-- **Ollama**：需要先设置环境变量 `OLLAMA_ORIGINS=chrome-extension://*`，再启动 Ollama。
+- **Ollama**：需要先设置环境变量 `OLLAMA_ORIGINS=chrome-extension://*`，再启动 Ollama。在「AI 服务」中添加 Ollama 预设，API Key 留空，点「获取模型列表」选择模型即可。Ollama 在局域网或 Tailscale 里的另一台电脑上时，那台电脑要用 `OLLAMA_HOST=0.0.0.0` 启动 Ollama（默认只监听本机），再把 Base URL 改成它的地址（如 `http://192.168.1.20:11434/v1` 或 `http://100.101.102.103:11434/v1`），点「测试连接」授权，API Key 同样留空。
 - **连接不到 AnkiConnect**：Anki 需要保持打开。如果在 AnkiConnect 中设置了 apiKey，在插件里也要填写同样的 Key。
 - **提示「尚未授权访问 …」**：你填写的接口地址不在预先授权的列表里，在对应设置分区点「测试连接」并允许访问即可。
 - **卡片已存在**：默认会拒绝同一牌组中首字段重复的卡片。可以点划词面板底部的「允许重复添加」按钮（或报错提示里的「允许重复并添加」），也可以在动作设置中开启；开启后同一结果可以「再添加一张」。
@@ -165,7 +165,7 @@ It is plain JavaScript with no build step, no third-party dependencies and no ba
 - **Result cache to save tokens**: selecting the same text again on the same page (in the same paragraph) shows the previous result without calling the AI, and cards already sent to Anki show as added. If you delete the card in Anki, it can be added again. Use regenerate to bypass the cache; editing the prompt, output fields or model invalidates old entries automatically.
 - **Customizable look**: the selection toolbar comes in Standard (icon, name and shortcut) or Lite (icons only); each action's icon can come from a built-in line-icon set or emoji, or be your own text or uploaded image.
 - **Chinese / English UI**: switch under *General & whitelist → Language*. The settings page, result panel, popup and error messages all follow it. The language of AI explanations is controlled separately by *Explanation language* used by both the built-in and your own actions. Pick a common language or type any other.
-- **Source and explanation languages**: the source language is detected automatically, or you can fix it under *General & whitelist → Source language*; it is used for read-aloud, card audio and the AI analysis. When you change the explanation language, unmodified prompts, panel layouts and card labels of the built-in actions switch with it: prompts come in Chinese and English, and labels cover the 8 languages in the list (Chinese, English, Japanese, Spanish, German, French, Russian, Italian); other languages use English. 
+- **Source and explanation languages**: the source language is detected automatically, or you can fix it under *General & whitelist → Source language*; it is used for read-aloud, card audio and the AI analysis. When you change the explanation language, unmodified prompts, panel layouts and card labels of the built-in actions switch with it: prompts come in Chinese and English, and labels cover the 8 languages in the list (Chinese, English, Japanese, Spanish, German, French, Russian, Italian); other languages use English. Anything you've edited stays as it is.
 - **Two themes**: Dusk (slate blue, blush, sky, lavender) and Lagoon (lagoon green, moss, gold), applied to the panel, settings page, popup, toolbar icon and Anki cards.
 - **Backup & migration**: export or import your settings (API keys excluded by default), and import custom actions from a Read Frog config.
 
@@ -235,7 +235,7 @@ The interface is currently in Simplified Chinese; the labels above include their
 - **Nothing happens when I select text**: click the toolbar icon and check that the site is whitelisted and access is granted (if not, you'll see *Grant access to this site*). If the icon shows `ON` and it still doesn't work, reload the page. Chrome's built-in PDF viewer, `chrome://` pages and the Web Store can't run extension scripts.
 - **HTTP 400 mentioning `response_format`**: the provider doesn't support JSON mode. Turn off *JSON 模式* (JSON mode) for that provider.
 - **Reasoning models** (e.g. `deepseek-reasoner`): supported; the panel shows a "thinking" state first. Leave Temperature empty.
-- **Ollama**: start it with the environment variable `OLLAMA_ORIGINS=chrome-extension://*`.
+- **Ollama**: start it with the environment variable `OLLAMA_ORIGINS=chrome-extension://*`. Add the Ollama preset under *AI providers*, leave the API key empty, and pick a model with *Fetch models*. If Ollama runs on another computer on your network or Tailscale, start it there with `OLLAMA_HOST=0.0.0.0` (by default it only listens locally), set the Base URL to that computer's address (e.g. `http://192.168.1.20:11434/v1` or `http://100.101.102.103:11434/v1`), and click *Test connection* to grant access. Leave the API key empty here too.
 - **Can't reach AnkiConnect**: keep Anki open. If you set an apiKey in AnkiConnect, enter the same key in the extension.
 - **"No access to … yet"**: the API address you entered isn't one of the pre-approved ones. Click *Test connection* in that settings section and allow access.
 - **"Card already exists"**: duplicates within a deck (same first field) are rejected by default. Toggle "Allow duplicates" in the panel footer (or click "Allow duplicate & add" in the error), or enable it per action in Settings; once on, you can "Add another" from the same result.

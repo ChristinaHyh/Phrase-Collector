@@ -90,7 +90,7 @@ function render() {
   const missingKey = cfg.actions
     .filter((a) => a.enabled)
     .map((a) => cfg.providers.find((p) => p.id === a.providerId))
-    .filter((p) => p && !p.apiKey && !/localhost|127\.0\.0\.1/.test(p.baseURL));
+    .filter((p) => p && !p.apiKey && PC.needsApiKey(p));
   if (missingKey.length) setCheck('aiCheck', 'err', tr('{name} 未填写 API Key · <a data-options>去设置</a>', { name: PC.escapeHtml(missingKey[0].name) }));
   else {
     const names = [...new Set(cfg.actions.filter((a) => a.enabled).map((a) => cfg.providers.find((p) => p.id === a.providerId)?.model).filter(Boolean))];

@@ -133,7 +133,7 @@ function openaiEndpoint(base) {
   return /\/chat\/completions$/.test(b) ? b : b + '/chat/completions';
 }
 
-async function httpError(res) {
+async function httpError(res, provider) {
   let detail = '';
   try {
     const text = await res.text();
@@ -150,7 +150,8 @@ async function httpError(res) {
   const hint =
     {
       400: tr('请求参数有误（若提示 response_format，请在 AI 服务里关闭“JSON 模式”）'),
-      401: tr('API Key 无效或未填写'),
+      // 本机服务不需要 Key，401 多半是 Ollama 云端模型未登录
+      401: provider && !PC.needsApiKey(provider) ? tr('本机 AI 服务拒绝了请求。如果选的是 Ollama 云端模型（名称以 -cloud 结尾），请先在终端运行 ollama signin 登录，或改用本地模型') : tr('API Key 无效或未填写'),
       402: tr('账户余额不足'),
       403: tr('无访问权限'),
       404: tr('接口地址或模型名称不存在'),
@@ -188,7 +189,7 @@ function safeJson(s) {
 
 async function streamAI(provider, system, user, { signal, onText, onThinking } = {}) {
   if (!provider) throw new Error(tr('未找到该动作使用的 AI 服务，请在设置中检查'));
-  if (!provider.apiKey && !/localhost|127\.0\.0\.1/.test(provider.baseURL || '')) {
+  if (!provider.apiKey && PC.needsApiKey(provider)) {
     throw new Error(tr('AI 服务「{name}」未填写 API Key，请在设置 → AI 服务中填写', { name: provider.name }));
   }
   if (!provider.model) throw new Error(tr('AI 服务「{name}」未填写模型名称', { name: provider.name }));
@@ -280,7 +281,7 @@ async function streamAI(provider, system, user, { signal, onText, onThinking } =
       ...(provider.jsonMode ? { response_format: { type: 'json_object' } } : {}),
     }),
   });
-  if (!res.ok) throw await httpError(res);
+  if (!res.ok) throw await httpError(res, provider);
   for await (const data of sseEvents(res, signal)) {
     if (data === '[DONE]') break;
     const j = safeJson(data);
@@ -642,7 +643,7 @@ async function listModels(provider) {
   }
   const base = String(provider.baseURL || '').replace(/\/+$/, '').replace(/\/chat\/completions$/, '');
   const res = await fetch(base + '/models', { headers: provider.apiKey ? { authorization: `Bearer ${provider.apiKey}` } : {} });
-  if (!res.ok) throw await httpError(res);
+  if (!res.ok) throw await httpError(res, provider);
   const j = await res.json();
   return (j.data || j.models || []).map((m) => m.id || m.name).filter(Boolean).sort();
 }

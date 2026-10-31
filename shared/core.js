@@ -747,6 +747,26 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
 
   // AI 服务实际请求的地址（Anthropic / Gemini 可以不填 Base URL）
   const PROVIDER_DEFAULT_URLS = { anthropic: 'https://api.anthropic.com', gemini: 'https://generativelanguage.googleapis.com' };
+  // 本机、局域网或 Tailscale 里的服务（如 Ollama）不需要 API Key；云端服务商必须填写
+  function needsApiKey(provider) {
+    if (provider?.type && provider.type !== 'openai') return true;
+    let host = '';
+    try {
+      host = new URL(provider?.baseURL || '').hostname.replace(/^\[|\]$/g, '');
+    } catch {
+      return true;
+    }
+    return !(
+      /^(localhost|::1|0\.0\.0\.0)$/.test(host) ||
+      /\.(local|ts\.net)$/.test(host) ||
+      /^(127|10)\.\d+\.\d+\.\d+$/.test(host) ||
+      /^192\.168\.\d+\.\d+$/.test(host) ||
+      /^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/.test(host) ||
+      /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d+\.\d+$/.test(host) || // Tailscale 等使用的 100.64.0.0/10
+      /^f[cd][0-9a-f]{2}:/i.test(host) // IPv6 内网地址（含 Tailscale 的 fd7a:…）
+    );
+  }
+
   const providerBaseUrl = (p) => p?.baseURL || PROVIDER_DEFAULT_URLS[p?.type] || '';
 
   // 已授权的匹配模式。*:// 规则只授权了其中一种协议时（如 manifest 预先声明的 http://localhost），返回那一种。
@@ -1040,6 +1060,7 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
     originPatterns,
     originPatternForUrl,
     providerBaseUrl,
+    needsApiKey,
     grantedPatterns,
     ungrantedOrigins,
     normalizeLang,
