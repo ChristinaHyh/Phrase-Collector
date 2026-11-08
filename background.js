@@ -303,7 +303,7 @@ chrome.runtime.onConnect.addListener((port) => {
     if (msg?.type !== 'run') return; // ping 消息仅用于保持 Service Worker 存活
     try {
       const cfg = await PC.loadConfig();
-      const action = cfg.actions.find((a) => a.id === msg.actionId);
+      const action = PC.effectiveAction(cfg, cfg.actions.find((a) => a.id === msg.actionId));
       if (!action) throw new Error(tr('划词动作不存在'));
       const provider = cfg.providers.find((p) => p.id === action.providerId) || cfg.providers[0];
       const { system, user } = buildPrompts(cfg, action, msg.context);
@@ -483,24 +483,30 @@ function formatField(value) {
   return PC.lightMarkdown(PC.escapeHtml(s)).replace(/\r?\n/g, '<br>');
 }
 
-function highlight(html, term) {
-  const t = PC.escapeHtml(String(term || '').trim());
+const unescapeHtml = (s) => s.replace(/&(amp|lt|gt|quot|#39);/g, (m, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" })[e]);
+
+// 在已转义的字段 HTML 里标出划选的那一处：按位置找，不扩大、不重复；标签（<br>、<b> 等）保持原样
+function highlight(html, term, before) {
+  const t = String(term || '').trim();
   if (t.length < 2) return null;
-  const re = new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-  let found = false;
-  // 只替换标签之外的文本，避免破坏 <br>、<a> 等
-  const out = html
-    .split(/(<[^>]+>)/)
-    .map((seg) =>
-      seg.startsWith('<')
-        ? seg
-        : seg.replace(re, (m) => {
-            found = true;
-            return `<span class="pc-hl">${m}</span>`;
-          })
-    )
+  const parts = html.split(/(<[^>]+>)/).map((seg) => (seg.startsWith('<') ? { tag: seg } : { text: unescapeHtml(seg) }));
+  let text = '';
+  for (const part of parts) {
+    if (part.tag) continue;
+    part.start = text.length;
+    text += part.text;
+  }
+  const hit = PC.findSelection(text, t, before);
+  if (!hit) return null;
+  return parts
+    .map((part) => {
+      if (part.tag) return part.tag;
+      const from = Math.max(hit.start - part.start, 0);
+      const to = Math.min(hit.end - part.start, part.text.length);
+      if (from >= to) return PC.escapeHtml(part.text);
+      return PC.escapeHtml(part.text.slice(0, from)) + `<span class="pc-hl">${PC.escapeHtml(part.text.slice(from, to))}</span>` + PC.escapeHtml(part.text.slice(to));
+    })
     .join('');
-  return found ? out : null;
 }
 
 // 非英语原文的 Anki TTS：模板里的 {{tts}} 只能固定一种语言，所以把带语言的 TTS 标签写进 Audio 字段
@@ -554,8 +560,8 @@ async function addNote({ actionId, values, context, deck, allowDuplicate }) {
   for (const [k, v] of Object.entries({ ...context, ...values })) formatted[k] = formatField(v);
   if (a.highlightField && formatted[a.highlightField]) {
     formatted[a.highlightField] =
-      highlight(formatted[a.highlightField], values[a.highlightTerm]) ??
-      highlight(formatted[a.highlightField], context?.selection) ??
+      highlight(formatted[a.highlightField], values[a.highlightTerm], context?.selectionBefore) ??
+      highlight(formatted[a.highlightField], context?.selection, context?.selectionBefore) ??
       formatted[a.highlightField];
   }
   // 模板里用到但输出字段中没有的来源信息，用真实网页数据补上

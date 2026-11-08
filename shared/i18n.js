@@ -147,6 +147,17 @@ globalThis.PC_I18N_EN = {
   '同一页面、同一动作、同一选区（及所在段落）再次划选时不再请求 AI，节省 Token。修改提示词、输出字段或模型后自动失效；面板右上角的「重新生成」会跳过缓存。':
     'Selecting the same text (in the same paragraph) on the same page with the same action reuses the result instead of calling the AI, saving tokens. The cache is invalidated when you change the prompts, output fields or model; “Regenerate” at the top right of the panel skips it.',
   原文语言: 'Source language',
+  解析模式: 'Analysis mode',
+  完整: 'Full',
+  简版: 'Lite',
+  完整版: 'Full',
+  '简版（省 Token）': 'Lite (fewer tokens)',
+  '简版只对两个内置动作生效：提示词更短，Phrase in Context 只输出短语译文、语境释义、原句和原句译文，Sentence Decode 只输出整句译文和一个关键短语的译文与解释。每次花费约为完整版的三分之一。也可以在工具栏弹窗中随时切换。':
+    'Lite applies to the two built-in actions with shorter prompts. Phrase in Context returns only the translation of the expression, its meaning in context, the original sentence and its translation; Sentence Decode returns only the sentence translation and one key phrase with its translation and explanation. Each call costs about a third of the full version. You can also switch it from the toolbar popup.',
+  '正在编辑简版，在「解析模式」为简版时使用。输出字段名应与完整版一致，才能写入同一个 Anki 笔记类型。':
+    'Editing the lite version, used when Analysis mode is Lite. Keep its output field names the same as the full version so cards go into the same Anki note type.',
+  '正在编辑完整版。简版在「通用与白名单 → 解析模式」或工具栏弹窗中切换。': 'Editing the full version. Switch to Lite under General & whitelist → Analysis mode, or from the toolbar popup.',
+  '简版：两个内置动作改用更短的提示词，只输出译文和语境释义等核心内容，省 Token': 'Lite: the two built-in actions use shorter prompts and return only translations and the meaning in context, using fewer tokens',
   自动识别: 'Auto-detect',
   '你阅读的文字是什么语言，用于朗读、Anki 发音和 AI 解析。默认自动识别：发音语言由浏览器按选中文字识别，AI 自行判断原文语言。只读一种语言、或自动识别不准时再指定。对应提示词变量 <code>{{sourceLanguage}}</code>，自动识别时为空。':
     'The language of the text you read, used for read-aloud, Anki audio and the AI analysis. By default it is detected automatically: the browser detects the audio language from the selected text, and the AI identifies the language itself. Set it if you only read one language or detection gets it wrong. This is the <code>{{sourceLanguage}}</code> prompt variable, empty when auto-detecting.',

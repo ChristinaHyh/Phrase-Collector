@@ -2,6 +2,7 @@ let cfg;
 let lastSaved = '';
 let saveTimer;
 const openActions = new Set();
+const editingLite = new Set(); // 正在编辑简版提示词的动作 id
 let ankiDecks = [];
 const tr = PC.t;
 const modelLists = new Map(); // providerId -> 已获取的模型列表
@@ -576,6 +577,14 @@ function renderGeneral() {
         helpHtml(tr('同一页面、同一动作、同一选区（及所在段落）再次划选时不再请求 AI，节省 Token。修改提示词、输出字段或模型后自动失效；面板右上角的「重新生成」会跳过缓存。'))
       ),
       row(
+        tr('解析模式'),
+        select(g, 'promptMode', [
+          ['full', tr('完整')],
+          ['lite', tr('简版（省 Token）')],
+        ]),
+        helpHtml(tr('简版只对两个内置动作生效：提示词更短，Phrase in Context 只输出短语译文、语境释义、原句和原句译文，Sentence Decode 只输出整句译文和一个关键短语的译文与解释。每次花费约为完整版的三分之一。也可以在工具栏弹窗中随时切换。'))
+      ),
+      row(
         tr('原文语言'),
         combo(
           input(g, 'sourceLanguage', {
@@ -842,19 +851,47 @@ function actionCard(a, idx) {
     )
   );
 
+  // 内置动作有完整版和简版两套提示词、输出字段和面板布局，Anki 设置共用
+  const lite = !!a.lite && editingLite.has(a.id);
+  const t = lite ? a.lite : a;
+  if (a.lite) {
+    const pick = (on) => () => {
+      if (on) editingLite.add(a.id);
+      else editingLite.delete(a.id);
+      renderActions();
+    };
+    inner.append(
+      h(
+        'div',
+        { class: 'variant-bar' },
+        h(
+          'div',
+          { class: 'variant-switch', role: 'group' },
+          h('button', { class: lite ? '' : 'on', 'aria-pressed': String(!lite), onclick: pick(false) }, tr('完整版')),
+          h('button', { class: lite ? 'on' : '', 'aria-pressed': String(lite), onclick: pick(true) }, tr('简版'))
+        ),
+        helpHtml(
+          lite
+            ? tr('正在编辑简版，在「解析模式」为简版时使用。输出字段名应与完整版一致，才能写入同一个 Anki 笔记类型。')
+            : tr('正在编辑完整版。简版在「通用与白名单 → 解析模式」或工具栏弹窗中切换。')
+        )
+      )
+    );
+  }
+
   // 提示词
   inner.append(
     group(
       tr('提示词'),
       tr('输出字段的 JSON 格式要求会自动追加到 System Prompt 末尾，无需手写。'),
-      stack('System Prompt', textarea(a, 'systemPrompt', 10)),
-      stack('User Prompt', textarea(a, 'prompt', 8))
+      stack('System Prompt', textarea(t, 'systemPrompt', lite ? 6 : 10)),
+      stack('User Prompt', textarea(t, 'prompt', lite ? 6 : 8))
     )
   );
 
   // 输出字段
   const fieldList = h('div', { class: 'fields' });
-  a.outputSchema.forEach((f, i) => {
+  t.outputSchema.forEach((f, i) => {
     const name = input(f, 'name', {
       placeholder: tr('字段名'),
       oninput: (el) => el.classList.toggle('invalid', !FIELD_NAME_RE.test(el.value)),
@@ -863,8 +900,8 @@ function actionCard(a, idx) {
     if (!FIELD_NAME_RE.test(f.name)) name.classList.add('invalid');
     const move = (d) => {
       const j = i + d;
-      if (j < 0 || j >= a.outputSchema.length) return;
-      [a.outputSchema[i], a.outputSchema[j]] = [a.outputSchema[j], a.outputSchema[i]];
+      if (j < 0 || j >= t.outputSchema.length) return;
+      [t.outputSchema[i], t.outputSchema[j]] = [t.outputSchema[j], t.outputSchema[i]];
       save();
       renderActions();
     };
@@ -883,7 +920,7 @@ function actionCard(a, idx) {
             'div',
             { class: 'field-ops' },
             h('button', { class: 'small', title: tr('上移'), 'aria-label': tr('上移'), disabled: i === 0, onclick: () => move(-1) }, svgIcon(ICON_PATHS.up)),
-            h('button', { class: 'small', title: tr('下移'), 'aria-label': tr('下移'), disabled: i === a.outputSchema.length - 1, onclick: () => move(1) }, svgIcon(ICON_PATHS.down)),
+            h('button', { class: 'small', title: tr('下移'), 'aria-label': tr('下移'), disabled: i === t.outputSchema.length - 1, onclick: () => move(1) }, svgIcon(ICON_PATHS.down)),
             h(
               'button',
               {
@@ -891,7 +928,7 @@ function actionCard(a, idx) {
                 title: tr('删除'),
                 'aria-label': tr('删除'),
                 onclick: () => {
-                  a.outputSchema.splice(i, 1);
+                  t.outputSchema.splice(i, 1);
                   save();
                   renderActions();
                 },
@@ -916,7 +953,7 @@ function actionCard(a, idx) {
         {
           class: 'small add-field',
           onclick: () => {
-            a.outputSchema.push({ id: PC.uid(), name: 'Field' + (a.outputSchema.length + 1), description: '', fill: 'ai' });
+            t.outputSchema.push({ id: PC.uid(), name: 'Field' + (t.outputSchema.length + 1), description: '', fill: 'ai' });
             save();
             renderActions();
           },
@@ -933,7 +970,7 @@ function actionCard(a, idx) {
       '',
       stack(
         tr('布局模板'),
-        textarea(a, 'layout', 10, tr('留空则按字段自动显示')),
+        textarea(t, 'layout', 10, tr('留空则按字段自动显示')),
         helpHtml(tr('HTML + Liquid 语法：<code>{{ Field }}</code>、<code>{{ Field | newline_to_br }}</code>、<code>{% if Field %}…{% endif %}</code>、<code>&lt;details&gt;</code> 折叠块。'))
       )
     )

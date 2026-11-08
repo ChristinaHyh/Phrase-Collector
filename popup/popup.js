@@ -97,6 +97,13 @@ function render() {
     setCheck('aiCheck', 'ok', tr('AI：{models}', { models: PC.escapeHtml(names.join(tr('、')) || tr('已配置')) }));
   }
 
+  const mode = cfg.general.promptMode === 'lite' ? 'lite' : 'full';
+  document.querySelectorAll('.seg button').forEach((b) => {
+    b.classList.toggle('on', b.dataset.mode === mode);
+    b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
+  });
+  document.querySelector('.mode').title = tr('简版：两个内置动作改用更短的提示词，只输出译文和语境释义等核心内容，省 Token');
+
   const list = $('actions');
   list.replaceChildren();
   const title = document.createElement('div');
@@ -158,6 +165,15 @@ $('toggleSite').addEventListener('click', async () => {
   }
   refresh();
 });
+
+// 切换解析模式：已打开的网页会通过 storage 变化读到新设置，下次划词生效
+document.querySelectorAll('.seg button').forEach((b) =>
+  b.addEventListener('click', async () => {
+    cfg.general.promptMode = b.dataset.mode;
+    await PC.saveConfig(cfg);
+    render();
+  })
+);
 
 $('openOptions').addEventListener('click', () => chrome.runtime.openOptionsPage());
 

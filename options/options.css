@@ -447,6 +447,12 @@ button.danger.solid:hover { background: color-mix(in srgb, var(--danger) 86%, #0
 .vars { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .vars span { font-size: 10px; letter-spacing: 1.4px; font-weight: 750; margin-right: 4px; }
 .group { padding: 28px 0 8px; }
+/* 内置动作：完整版 / 简版切换 */
+.variant-bar { padding: 22px 0 0; }
+.variant-switch { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--input-line); border-radius: 12px; background: var(--field); }
+.variant-switch button { height: 30px; padding: 0 16px; font-size: 12.5px; border: 0; border-radius: 9px; background: transparent; }
+.variant-switch button.on { background: var(--btn); color: var(--btn-fg); }
+.variant-switch button:active:not(:disabled) { transform: none; }
 .group + .group { border-top: 1px solid var(--line-2); margin-top: 20px; }
 .group-head { margin-bottom: 14px; }
 .group-head h3 { margin: 0; font-size: 18px; }

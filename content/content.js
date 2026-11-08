@@ -209,6 +209,10 @@ kbd{font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-
   function ensureRoot() {
     if (host?.isConnected) return;
     host = document.createElement('phrase-collector-ui');
+    // 网页翻译插件会进入打开的 Shadow DOM 翻译里面的文字。Read Frog 只认 notranslate 类名，
+    // 浏览器自带翻译认 translate="no"，两个都标上，划词面板就不会被翻译。
+    host.className = 'notranslate';
+    host.setAttribute('translate', 'no');
     host.style.cssText = 'position:absolute;top:0;left:0;width:0;height:0;z-index:2147483647;';
     root = host.attachShadow({ mode: 'open' });
     try {
@@ -218,7 +222,7 @@ kbd{font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-
     } catch {
       root.append(el('style', {}, STYLE));
     }
-    const wrap = el('div', { class: 'pc' });
+    const wrap = el('div', { class: 'pc notranslate', translate: 'no' });
     applyLook(wrap);
     root.append(wrap);
     document.documentElement.append(host);
@@ -291,10 +295,51 @@ kbd{font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-
   // ---------------------------------------------------------------------------
   // 选区与上下文
   // ---------------------------------------------------------------------------
+  // Read Frog 双语模式把译文插在原文段落里，取选中文字和上下文时要去掉，
+  // 否则译文会混进发给 AI 的内容和 Anki 卡片。
+  const TRANSLATION = '.read-frog-translated-content-wrapper';
+  const SKIP_TEXT = `${TRANSLATION},script,style,noscript,template`;
+  const BLOCK_TAGS = /^(ADDRESS|ARTICLE|ASIDE|BLOCKQUOTE|DD|DIV|DL|DT|FIGCAPTION|FIGURE|FOOTER|FORM|H[1-6]|HEADER|HR|LI|MAIN|NAV|OL|P|PRE|SECTION|TABLE|TR|UL)$/;
+
+  // 不含译文的文字，按块级元素换行，与 innerText 的效果接近
+  function textWithoutTranslations(node) {
+    const parts = [];
+    const walk = (n) => {
+      for (const child of n.childNodes) {
+        if (child.nodeType === 3) parts.push(child.data);
+        if (child.nodeType !== 1 || child.matches(SKIP_TEXT)) continue;
+        if (child.tagName === 'BR') {
+          parts.push('\n');
+          continue;
+        }
+        const block = BLOCK_TAGS.test(child.tagName);
+        if (block) parts.push('\n');
+        walk(child);
+        if (block) parts.push('\n');
+      }
+    };
+    walk(node);
+    return parts.join('').replace(/[^\S\n]+/g, ' ').replace(/ *\n */g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  // 元素的可读文字；含有 Read Frog 译文时去掉译文
+  const readableText = (element) =>
+    element?.querySelector?.(TRANSLATION) ? textWithoutTranslations(element) : (element?.innerText || element?.textContent || '');
+
+  // 选中的文字；跨过译文时去掉译文，只选中了译文时保留原样
+  function selectedText(sel) {
+    const raw = sel.toString();
+    if (!raw.trim() || !document.querySelector(TRANSLATION)) return raw;
+    const fragment = sel.getRangeAt(0).cloneContents();
+    if (!fragment.querySelector(TRANSLATION)) return raw;
+    return textWithoutTranslations(fragment) || raw;
+  }
+
   function selectionInfo() {
     const sel = window.getSelection();
-    const text = sel?.toString().trim() || '';
-    if (!text || !sel.rangeCount) return null;
+    if (!sel?.rangeCount) return null;
+    const text = selectedText(sel).trim();
+    if (!text) return null;
     const range = sel.getRangeAt(0);
     const rects = range.getClientRects();
     const rect = rects.length ? rects[rects.length - 1] : range.getBoundingClientRect();
@@ -302,16 +347,32 @@ kbd{font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-
     return { text, range, rect, box };
   }
 
-  function getParagraphs(range, text) {
-    const max = Number(cfg?.general.maxContextChars) || 2000;
+  const BLOCK_SELECTOR = 'p,li,blockquote,dd,dt,td,th,pre,h1,h2,h3,h4,h5,h6,figcaption,[data-testid="tweetText"],article,section,div';
+
+  function blockOf(range) {
     let node = range.commonAncestorContainer;
     if (node.nodeType !== 1) node = node.parentElement;
-    const block =
-      node?.closest('p,li,blockquote,dd,dt,td,th,pre,h1,h2,h3,h4,h5,h6,figcaption,[data-testid="tweetText"],article,section,div') || node;
-    let ctx = (block?.innerText || block?.textContent || text).replace(/\n{3,}/g, '\n\n').trim();
+    return node?.closest(BLOCK_SELECTOR) || node;
+  }
+
+  // 划选处之前的一小段文字，用来在原句里认出划的是哪一处（同一个词可能出现多次）
+  function textBefore(range) {
+    const block = blockOf(range);
+    if (!block) return '';
+    const before = document.createRange();
+    before.setStart(block, 0);
+    before.setEnd(range.startContainer, range.startOffset);
+    const fragment = before.cloneContents();
+    return (fragment.querySelector(TRANSLATION) ? textWithoutTranslations(fragment) : before.toString()).slice(-80);
+  }
+
+  function getParagraphs(range, text, limit) {
+    const max = Math.min(Number(cfg?.general.maxContextChars) || 2000, limit || Infinity);
+    const block = blockOf(range);
+    let ctx = (readableText(block) || text).replace(/\n{3,}/g, '\n\n').trim();
     // 段落过短（如选中了行内元素）时向上扩展一层
     if (ctx.length < Math.min(text.length + 40, 200) && block?.parentElement && block.parentElement !== document.body) {
-      const up = (block.parentElement.innerText || '').trim();
+      const up = readableText(block.parentElement).trim();
       if (up.length <= max * 2) ctx = up;
     }
     if (ctx.length > max) {
@@ -322,10 +383,11 @@ kbd{font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-
     return ctx || text;
   }
 
-  function buildContext(info) {
+  function buildContext(info, action) {
     return {
       selection: info.text.slice(0, 5000),
-      paragraphs: getParagraphs(info.range, info.text),
+      selectionBefore: textBefore(info.range),
+      paragraphs: getParagraphs(info.range, info.text, action?.isLite ? PC.LITE_CONTEXT_CHARS : 0),
       webTitle: document.title,
       webUrl: location.href,
       // 设置里指定了原文语言时直接使用；否则先用网页声明的语言，识别结果出来后替换
@@ -460,9 +522,10 @@ kbd{font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-
   }
 
   function runAction(action, info, { fresh = false } = {}) {
+    action = PC.effectiveAction(cfg, action); // 简版模式下换成简版提示词
     ensureRoot();
     closePanel();
-    const context = buildContext(info);
+    const context = buildContext(info, action);
     detectSourceLang(context).then((lang) => {
       if (lang) context.sourceLang = lang;
     });
@@ -477,7 +540,7 @@ kbd{font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-
         'div',
         { class: 'titles' },
         el('div', { class: 'sub' }, provider ? [provider.name, provider.model].filter(Boolean).join(' · ') : 'Phrase Collector'),
-        el('div', { class: 'title' }, action.name)
+        el('div', { class: 'title' }, action.isLite ? `${action.name} · ${tr('简版')}` : action.name)
       ),
       el(
         'div',
@@ -734,33 +797,38 @@ kbd{font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-
     // 结果标题与划选内容相同时，不再重复显示划选条
     const norm = (t) => t.replace(/\s+/g, ' ').trim().toLowerCase();
     r.ui.sel.hidden = !!headings[0] && norm(headings[0].textContent) === norm(r.context.selection);
-    highlightTerm(body, values[r.action.anki.highlightTerm] || r.context.selection);
+    highlightTerm(body, values[r.action.anki.highlightTerm] || r.context.selection, r.context.selectionBefore);
     if (!r.done) body.append(pending());
   }
 
-  // 在原句引用块中高亮当前表达
-  function highlightTerm(body, term) {
+  // 在原句引用块中标出划选的那一处：按位置找，不会扩大到别处，也不会标出其他相同的词
+  function highlightTerm(body, term, before) {
     const t = PC.valueToString(term).trim();
     if (t.length < 2 || t.length > 120) return;
-    const re = new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
     for (const quote of body.querySelectorAll('blockquote')) {
       const walker = document.createTreeWalker(quote, NodeFilter.SHOW_TEXT);
       const nodes = [];
-      while (walker.nextNode()) nodes.push(walker.currentNode);
-      for (const node of nodes) {
-        const text = node.nodeValue;
-        re.lastIndex = 0;
-        if (!re.test(text)) continue;
-        const frag = document.createDocumentFragment();
-        let last = 0;
-        text.replace(re, (m, i) => {
-          frag.append(text.slice(last, i), el('mark', {}, m));
-          last = i + m.length;
-          return m;
-        });
-        frag.append(text.slice(last));
-        node.replaceWith(frag);
+      let text = '';
+      while (walker.nextNode()) {
+        nodes.push([walker.currentNode, text.length]);
+        text += walker.currentNode.nodeValue;
       }
+      const hit = PC.findSelection(text, t, before);
+      if (!hit) continue;
+      const point = (pos, isEnd) => {
+        for (const [node, base] of nodes) {
+          const len = node.nodeValue.length;
+          if (pos < base + len || (isEnd && pos === base + len)) return [node, pos - base];
+        }
+        const [node] = nodes[nodes.length - 1];
+        return [node, node.nodeValue.length];
+      };
+      const range = document.createRange();
+      range.setStart(...point(hit.start, false));
+      range.setEnd(...point(hit.end, true));
+      const mark = el('mark');
+      mark.append(range.extractContents());
+      range.insertNode(mark);
     }
   }
 

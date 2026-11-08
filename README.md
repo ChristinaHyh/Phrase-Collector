@@ -36,6 +36,7 @@ Phrase Collector 是一个 Chrome 扩展，面向阅读外语材料的学习者�
 - **一键制作 Anki 卡片**：自动创建并维护笔记类型，正反面模板已设计好；也可以映射到你已有的笔记类型。网页标题和链接由插件直接写入卡片，不交给 AI，避免编造。
 - **卡片发音**：使用 Anki 内置 TTS（可指定语音和语速），或下载有道 / Google 在线音频写入卡片，下载失败时自动回退到 TTS。发音语言跟随划词时识别出的原文语言：英语用设置里的口音，西班牙语、日语等其他语言自动切换。
 - **网站白名单**：插件只在你指定并授权的网站上运行，也可以切换为所有网站。直接粘贴网址会自动转换成通用域名，例如 `https://www.nytimes.com/2026/…` 会变成 `*.nytimes.com`。
+- **简版解析模式**：点工具栏图标，在弹窗里可以随时在「完整」和「简版」之间切换（设置页「通用与白名单 → 解析模式」也可以）。简版下两个内置动作改用更短的提示词：Phrase in Context 只输出短语译文、语境释义、原句和原句译文；Sentence Decode 只输出整句译文和一个关键短语的译文及其在句中的含义。释义要求结合语境解释，不只是重复译文。每次调用的花费约为完整版的三分之一。简版的提示词也可以在动作编辑器里切到「简版」修改，卡片写入同一个 Anki 笔记类型。
 - **省 Token 的结果缓存**：在同一页面再次划选同一内容（同一段落）时，直接显示上次的结果，不再请求 AI；已经加入 Anki 的会显示「已添加」，如果卡片已在 Anki 中删除，会恢复为可以再次添加。点「重新生成」可以跳过缓存。修改提示词、输出字段或模型后，旧缓存自动失效。
 - **可定制的外观**：划词按钮有 Standard（图标 + 名称 + 快捷键）和 Lite（只显示图标）两种样式；每个动作的图标可以从线条图标库或 Emoji 中挑选，也可以输入文字或上传图片。
 - **中英文界面**：在「通用与白名单 → 界面语言」中切换中文 / English，设置页、划词面板、弹窗和错误提示都会跟着切换。AI 解释所用的语言由「解释语言」单独控制，内置动作和自定义动作都会使用它，可以从常用语言中选择，也可以直接输入。
@@ -76,7 +77,7 @@ Edge、Brave 等基于 Chromium 的浏览器也可以用同样的方式安装。
 
 | 分区 | 内容 |
 | --- | --- |
-| 通用与白名单 | 界面语言、主题、生效范围、白名单规则、划词按钮（显示方式与 Standard / Lite 样式）、结果缓存、原文语言、解释语言、上下文长度 |
+| 通用与白名单 | 界面语言、主题、生效范围、白名单规则、划词按钮（显示方式与 Standard / Lite 样式）、结果缓存、解析模式、原文语言、解释语言、上下文长度 |
 | AI 服务 | 多个服务并存；接口类型、Base URL、API Key、模型、Temperature、JSON 模式 |
 | 划词动作 | 图标、提示词、输出字段、面板布局、快捷键、牌组、标签、发音字段、笔记类型 |
 | Anki 与发音 | AnkiConnect 地址和 Key、英语 TTS 口音、语音、语速，以及在线音频来源 |
@@ -99,6 +100,7 @@ Edge、Brave 等基于 Chromium 的浏览器也可以用同样的方式安装。
 | Phrase in Context | `Phrase Collector · Phrase` | Expression, MeaningZH, ContextEN, ContextZH, NuanceZH, PatternEN, SourceTitle, SourceURL, Audio |
 | Sentence Decode | `Phrase Collector · Sentence` | SentenceEN, SentenceZH, Core, Chunks, LogicZH, HardPartZH, Takeaways, SourceURL, Audio |
 
+- `Expression` 就是你划选的文字，由插件直接填写，不交给 AI，所以卡片正面不会被 AI 补全或扩写。`ContextEN`（原句）里只标出你划选的那一处。如果想让 AI 改写，可以在动作的输出字段里把 `Expression` 的填写方式改回「AI 生成」。
 - 卡片模板可以在「划词动作 → Anki 卡片 → 卡片模板（高级）」中修改，`[[TTS]]` 是发音占位符。
 - 在托管模式下，Anki 里的模板以插件中的设置为准。修改发音设置后，点「同步模板到 Anki」即可更新已有卡片。
 - 模板里用到、但输出字段中没有的字段，会自动加到笔记类型里，避免 Anki 报「未找到字段」。
@@ -120,6 +122,7 @@ Edge、Brave 等基于 Chromium 的浏览器也可以用同样的方式安装。
 - **Ollama**：需要先设置环境变量 `OLLAMA_ORIGINS=chrome-extension://*`，再启动 Ollama。在「AI 服务」中添加 Ollama 预设，API Key 留空，点「获取模型列表」选择模型即可。Ollama 在局域网或 Tailscale 里的另一台电脑上时，那台电脑要用 `OLLAMA_HOST=0.0.0.0` 启动 Ollama（默认只监听本机），再把 Base URL 改成它的地址（如 `http://192.168.1.20:11434/v1` 或 `http://100.101.102.103:11434/v1`），点「测试连接」授权，API Key 同样留空。
 - **连接不到 AnkiConnect**：Anki 需要保持打开。如果在 AnkiConnect 中设置了 apiKey，在插件里也要填写同样的 Key。
 - **提示「尚未授权访问 …」**：你填写的接口地址不在预先授权的列表里，在对应设置分区点「测试连接」并允许访问即可。
+- **开着 Read Frog 等网页翻译**：划词面板标记了不翻译，不会被翻译。Read Frog 双语模式插入的译文也不会混进选中文字和上下文。如果用的是只显示译文的模式，原文已被替换，划词拿到的就是译文，这时请切回双语模式。
 - **卡片已存在**：默认会拒绝同一牌组中首字段重复的卡片。可以点划词面板底部的「允许重复添加」按钮（或报错提示里的「允许重复并添加」），也可以在动作设置中开启；开启后同一结果可以「再添加一张」。
 
 ### 项目结构
@@ -162,6 +165,7 @@ It is plain JavaScript with no build step, no third-party dependencies and no ba
 - **One-click Anki cards**: the extension creates and maintains its own note types with ready-made templates, or maps onto a note type you already have. Page title and URL are filled in by the extension itself, never by the AI.
 - **Audio on cards**: Anki's built-in TTS (choose voice and speed), or Youdao / Google audio downloaded into the card, falling back to TTS if the download fails. The audio language follows the language detected in your selection: English uses the accent you set, and Spanish, Japanese and other languages switch automatically.
 - **Site whitelist**: the extension only runs on sites you add and grant access to (or switch to all sites). Paste a full URL and it becomes a domain pattern automatically, e.g. `https://www.nytimes.com/2026/…` → `*.nytimes.com`.
+- **Lite mode**: switch between Full and Lite at any time from the toolbar popup (or under *General & whitelist → Analysis mode*). In Lite mode the two built-in actions use shorter prompts: Phrase in Context returns only the translation of the expression, its meaning in context, the original sentence and its translation; Sentence Decode returns only the sentence translation and one key phrase with its translation and its meaning in the sentence. Explanations stay contextual rather than repeating the translation. Each call costs about a third of the full version. The lite prompts can be edited in the action editor by switching it to *Lite*, and cards go into the same Anki note type.
 - **Result cache to save tokens**: selecting the same text again on the same page (in the same paragraph) shows the previous result without calling the AI, and cards already sent to Anki show as added. If you delete the card in Anki, it can be added again. Use regenerate to bypass the cache; editing the prompt, output fields or model invalidates old entries automatically.
 - **Customizable look**: the selection toolbar comes in Standard (icon, name and shortcut) or Lite (icons only); each action's icon can come from a built-in line-icon set or emoji, or be your own text or uploaded image.
 - **Chinese / English UI**: switch under *General & whitelist → Language*. The settings page, result panel, popup and error messages all follow it. The language of AI explanations is controlled separately by *Explanation language* used by both the built-in and your own actions. Pick a common language or type any other.
@@ -217,6 +221,7 @@ The interface is currently in Simplified Chinese; the labels above include their
 | Phrase in Context | `Phrase Collector · Phrase` | Expression, MeaningZH, ContextEN, ContextZH, NuanceZH, PatternEN, SourceTitle, SourceURL, Audio |
 | Sentence Decode | `Phrase Collector · Sentence` | SentenceEN, SentenceZH, Core, Chunks, LogicZH, HardPartZH, Takeaways, SourceURL, Audio |
 
+- `Expression` is exactly the text you selected, filled in by the extension rather than the AI, so the AI can't complete or extend it on the card. `ContextEN` (the original sentence) marks only the spot you selected. To let the AI write it instead, set `Expression` back to AI in the action's output fields.
 - Card templates are editable under the action's advanced card template settings; `[[TTS]]` is the audio placeholder.
 - For note types the extension manages, its templates take precedence over edits made in Anki. After changing audio settings, use *同步模板到 Anki* (Sync templates to Anki) to update existing cards.
 - Any field that a template references but the output fields lack is added to the note type automatically, so Anki won't reject the template.
@@ -238,6 +243,7 @@ The interface is currently in Simplified Chinese; the labels above include their
 - **Ollama**: start it with the environment variable `OLLAMA_ORIGINS=chrome-extension://*`. Add the Ollama preset under *AI providers*, leave the API key empty, and pick a model with *Fetch models*. If Ollama runs on another computer on your network or Tailscale, start it there with `OLLAMA_HOST=0.0.0.0` (by default it only listens locally), set the Base URL to that computer's address (e.g. `http://192.168.1.20:11434/v1` or `http://100.101.102.103:11434/v1`), and click *Test connection* to grant access. Leave the API key empty here too.
 - **Can't reach AnkiConnect**: keep Anki open. If you set an apiKey in AnkiConnect, enter the same key in the extension.
 - **"No access to … yet"**: the API address you entered isn't one of the pre-approved ones. Click *Test connection* in that settings section and allow access.
+- **Web page translators such as Read Frog**: the panel is marked not to be translated. Translations that Read Frog's bilingual mode inserts are left out of the selection and context. In a translation-only mode the original text has been replaced, so the selection is the translation; switch back to bilingual mode.
 - **"Card already exists"**: duplicates within a deck (same first field) are rejected by default. Toggle "Allow duplicates" in the panel footer (or click "Allow duplicate & add" in the error), or enable it per action in Settings; once on, you can "Add another" from the same result.
 
 ### Project structure

@@ -106,3 +106,9 @@ footer button:hover { background: var(--card); border-color: var(--line); }
 .actions .ic { display: grid; place-items: center; width: 18px; height: 18px; font-size: 14px; color: var(--accent); }
 .pc-icon-svg { width: 100%; height: 100%; }
 .pc-icon-img { width: 100%; height: 100%; object-fit: contain; border-radius: 4px; }
+.mode { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px 10px 16px; }
+.mode .label { color: var(--fg-2); font-weight: 650; }
+.seg { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--input-line); border-radius: 11px; background: var(--paper); }
+.seg button { width: auto; height: 28px; padding: 0 14px; border: 0; border-radius: 8px; background: transparent; font-size: 12px; }
+.seg button.on { background: var(--btn); color: var(--btn-fg); }
+.seg button:active:not(:disabled) { transform: none; }

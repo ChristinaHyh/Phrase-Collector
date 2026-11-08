@@ -1,7 +1,7 @@
 // 内置划词动作的默认提示词、输出字段、面板布局和卡片文字，按解释语言（{{targetLanguage}}）选用：
 // - 提示词和字段说明：简体中文、English 两套，其他解释语言用 English；
 // - 面板和卡片上的标签：labels 里的每种语言一套，其他语言用 English。
-// 原文语言默认由 AI 自行判断；设置里指定了原文语言时，通过 {{sourceLanguage}} 写进提示词。
+// 每个内置动作还有一个省 Token 的简版（lite）。原文语言默认由 AI 自行判断；设置里指定了原文语言时，通过 {{sourceLanguage}} 写进提示词。
 globalThis.PC_PROMPTS = {
   phrase: {
     name: "Phrase in Context",
@@ -62,6 +62,63 @@ globalThis.PC_PROMPTS = {
   <p>{{ PatternEN }}</p>
   {% endif %}
 </details>`,
+    // 简版：更短的提示词、更少的输出字段（设置 → 解析模式，或工具栏弹窗中切换）
+    lite: {
+      "prompt": "Selected expression:\n{{selection}}\n\n{% if sourceLanguage %}Source language: {{sourceLanguage}}\n\n{% endif %}Context:\n{{paragraphs}}",
+      "fields": [
+        "Expression",
+        "ExpressionZH",
+        "MeaningZH",
+        "ContextEN",
+        "ContextZH",
+        "SourceTitle",
+        "SourceURL"
+      ],
+      "text": {
+        "zh-CN": {
+          "systemPrompt": "你是外语阅读助手。原文可以是任何语言；用户注明了原文语言时以它为准，否则根据原文判断。\n用{{targetLanguage}}给出用户选中的表达和所在句子的译文，并简洁解释这个表达在当前语境中的意思：它在这里具体指什么，带有怎样的语气或用法。释义不要只是重复译文或词典释义。\n原文表达和原句保留原文语言。不编造原文或背景。",
+          "fields": {
+            "Expression": "选中的表达，保持原文语言；若选中的是表达的一部分，补全为常用形式。",
+            "ExpressionZH": "该表达在此语境中的{{targetLanguage}}译文，简短，只给最贴切的一个。",
+            "MeaningZH": "用 1–2 句{{targetLanguage}}解释它在这句话里的意思和语气或用法，不要只重复译文。",
+            "ContextEN": "原样复制包含该表达的那一句原文，不得改写或编造。",
+            "ContextZH": "把 ContextEN 翻译成自然、准确的{{targetLanguage}}。"
+          }
+        },
+        "en": {
+          "systemPrompt": "You are a foreign-language reading assistant. The source text can be in any language; if the user message states the source language, use it, otherwise identify it from the text.\nIn {{targetLanguage}}, translate the selected expression and the sentence it appears in, and briefly explain what the expression means in this context: what it refers to here, and its tone or usage. The explanation should not just repeat the translation or a dictionary definition.\nKeep the expression and the original sentence in the source language. Do not invent text or background.",
+          "fields": {
+            "Expression": "The selected expression, in the source language. If only part of an expression was selected, give its complete common form.",
+            "ExpressionZH": "A short {{targetLanguage}} translation of the expression as used here. Give only the best fit.",
+            "MeaningZH": "In 1–2 sentences of {{targetLanguage}}, explain what it means in this sentence and its tone or usage, rather than repeating the translation.",
+            "ContextEN": "Copy exactly the source sentence that contains the expression. Do not rewrite or invent it.",
+            "ContextZH": "Translate ContextEN into natural, accurate {{targetLanguage}}."
+          }
+        }
+      },
+      layout: (L) => `{% if Expression %}
+<h3>{{ Expression }}</h3>
+{% endif %}
+
+{% if ExpressionZH %}
+<p><strong>${L.translation}</strong></p>
+<p>{{ ExpressionZH }}</p>
+{% endif %}
+
+{% if MeaningZH %}
+<p><strong>${L.meaning}</strong></p>
+<p>{{ MeaningZH }}</p>
+{% endif %}
+
+{% if ContextEN %}
+<p><strong>${L.context}</strong></p>
+<blockquote>{{ ContextEN }}</blockquote>
+{% endif %}
+
+{% if ContextZH %}
+<p>{{ ContextZH }}</p>
+{% endif %}`,
+    },
   },
   sentence: {
     name: "Sentence Decode",
@@ -130,6 +187,45 @@ globalThis.PC_PROMPTS = {
   <p>{{ Takeaways | newline_to_br }}</p>
   {% endif %}
 </details>`,
+    // 简版：更短的提示词、更少的输出字段（设置 → 解析模式，或工具栏弹窗中切换）
+    lite: {
+      "prompt": "Sentence:\n{{selection}}\n\n{% if sourceLanguage %}Source language: {{sourceLanguage}}\n\n{% endif %}Context:\n{{paragraphs}}",
+      "fields": [
+        "SentenceEN",
+        "SentenceZH",
+        "Takeaways",
+        "SourceURL"
+      ],
+      "text": {
+        "zh-CN": {
+          "systemPrompt": "你是外语阅读助手。原文可以是任何语言；用户注明了原文语言时以它为准，否则根据原文判断。\n用{{targetLanguage}}帮助学习者读懂选中的句子：给出忠实、自然的整句译文，再挑出句中最影响理解的一个短语或结构，给出它的译文，并解释它在这句话里的意思和作用。\n原文片段保留原文语言。简洁，不编造。",
+          "fields": {
+            "SentenceZH": "把整句翻译成自然、忠实的{{targetLanguage}}。",
+            "Takeaways": "挑出句中最关键的 1 个短语或结构，写成「原文片段 → {{targetLanguage}}译文；它在本句中的含义和作用」，含义部分不要只重复译文。"
+          }
+        },
+        "en": {
+          "systemPrompt": "You are a foreign-language reading assistant. The source text can be in any language; if the user message states the source language, use it, otherwise identify it from the text.\nIn {{targetLanguage}}, help the learner understand the selected sentence: give a faithful, natural translation of it, then pick the one phrase or structure that matters most for understanding it, translate it, and explain what it means and does in this sentence.\nKeep source fragments in the source language. Be concise and don't invent anything.",
+          "fields": {
+            "SentenceZH": "Translate the whole sentence into natural, faithful {{targetLanguage}}.",
+            "Takeaways": "The one key phrase or structure, written as \"source fragment → {{targetLanguage}} translation; what it means and does in this sentence\". The explanation should not just repeat the translation."
+          }
+        }
+      },
+      layout: (L) => `{% if SentenceEN %}
+<h3>{{ SentenceEN }}</h3>
+{% endif %}
+
+{% if SentenceZH %}
+<p><strong>${L.translation}</strong></p>
+<p>{{ SentenceZH }}</p>
+{% endif %}
+
+{% if Takeaways %}
+<p><strong>${L.keyPhrase}</strong></p>
+<p>{{ Takeaways | newline_to_br }}</p>
+{% endif %}`,
+    },
   },
   // 面板布局（layout）和 Anki 卡片模板（core.js）里的标签
   labels: {
@@ -153,7 +249,9 @@ globalThis.PC_PROMPTS = {
       "cardLogic": "逻辑关系 · Logic",
       "cardHard": "阅读难点 · Hard Part",
       "cardTakeaways": "迁移表达 · Takeaways",
-      "sentencePrompt": "先尝试理解整句，再翻面检查结构与逻辑"
+      "sentencePrompt": "先尝试理解整句，再翻面检查结构与逻辑",
+      "keyPhrase": "关键短语",
+      "translation": "译文"
     },
     "en": {
       "meaning": "Meaning in context",
@@ -175,7 +273,9 @@ globalThis.PC_PROMPTS = {
       "cardLogic": "Logic",
       "cardHard": "Hard part",
       "cardTakeaways": "Takeaways",
-      "sentencePrompt": "Try to understand the whole sentence, then flip to check its structure and logic"
+      "sentencePrompt": "Try to understand the whole sentence, then flip to check its structure and logic",
+      "keyPhrase": "Key phrase",
+      "translation": "Translation"
     },
     "ja": {
       "meaning": "文脈での意味",
@@ -197,7 +297,9 @@ globalThis.PC_PROMPTS = {
       "cardLogic": "論理関係",
       "cardHard": "難しいところ",
       "cardTakeaways": "覚えたい表現",
-      "sentencePrompt": "まず文全体を理解してから、裏返して構造と論理を確認しよう"
+      "sentencePrompt": "まず文全体を理解してから、裏返して構造と論理を確認しよう",
+      "keyPhrase": "鍵となる表現",
+      "translation": "訳"
     },
     "es": {
       "meaning": "Significado en contexto",
@@ -219,7 +321,9 @@ globalThis.PC_PROMPTS = {
       "cardLogic": "Lógica",
       "cardHard": "Dificultad",
       "cardTakeaways": "Para recordar",
-      "sentencePrompt": "Intenta entender la frase completa y luego gira la tarjeta para revisar su estructura y su lógica"
+      "sentencePrompt": "Intenta entender la frase completa y luego gira la tarjeta para revisar su estructura y su lógica",
+      "keyPhrase": "Expresión clave",
+      "translation": "Traducción"
     },
     "de": {
       "meaning": "Bedeutung im Kontext",
@@ -241,7 +345,9 @@ globalThis.PC_PROMPTS = {
       "cardLogic": "Logik",
       "cardHard": "Schwierigkeit",
       "cardTakeaways": "Zum Merken",
-      "sentencePrompt": "Versuche zuerst, den ganzen Satz zu verstehen, und prüfe dann auf der Rückseite Aufbau und Logik"
+      "sentencePrompt": "Versuche zuerst, den ganzen Satz zu verstehen, und prüfe dann auf der Rückseite Aufbau und Logik",
+      "keyPhrase": "Schlüsselausdruck",
+      "translation": "Übersetzung"
     },
     "fr": {
       "meaning": "Sens dans le contexte",
@@ -263,7 +369,9 @@ globalThis.PC_PROMPTS = {
       "cardLogic": "Logique",
       "cardHard": "Difficulté",
       "cardTakeaways": "À retenir",
-      "sentencePrompt": "Essayez de comprendre la phrase entière, puis retournez la carte pour vérifier sa structure et sa logique"
+      "sentencePrompt": "Essayez de comprendre la phrase entière, puis retournez la carte pour vérifier sa structure et sa logique",
+      "keyPhrase": "Expression clé",
+      "translation": "Traduction"
     },
     "ru": {
       "meaning": "Значение в контексте",
@@ -285,7 +393,9 @@ globalThis.PC_PROMPTS = {
       "cardLogic": "Логика",
       "cardHard": "Трудное место",
       "cardTakeaways": "Запомнить",
-      "sentencePrompt": "Сначала попробуйте понять всё предложение, затем переверните карточку и проверьте структуру и логику"
+      "sentencePrompt": "Сначала попробуйте понять всё предложение, затем переверните карточку и проверьте структуру и логику",
+      "keyPhrase": "Ключевое выражение",
+      "translation": "Перевод"
     },
     "it": {
       "meaning": "Significato nel contesto",
@@ -307,7 +417,9 @@ globalThis.PC_PROMPTS = {
       "cardLogic": "Logica",
       "cardHard": "Difficoltà",
       "cardTakeaways": "Da ricordare",
-      "sentencePrompt": "Prova a capire tutta la frase, poi gira la carta per controllare struttura e logica"
+      "sentencePrompt": "Prova a capire tutta la frase, poi gira la carta per controllare struttura e logica",
+      "keyPhrase": "Espressione chiave",
+      "translation": "Traduzione"
     }
   },
 };

@@ -93,7 +93,7 @@ hr#answer{border:none;border-top:1px dashed var(--pc-hr);margin:16px 0;}`;
   const PHRASE_BACK = (L) => `<div class="pc-answer">{{FrontSide}}</div>
 <div class="pc-card">
 <hr id="answer">
-<div class="pc-meaning">{{MeaningZH}}</div>
+<div class="pc-meaning">{{#ExpressionZH}}<b>{{ExpressionZH}}</b><br>{{/ExpressionZH}}{{MeaningZH}}</div>
 ${section('ContextZH', L.cardContext)}
 ${foldSection('NuanceZH', L.cardNuance)}
 ${foldSection('PatternEN', L.cardPattern)}
@@ -151,10 +151,18 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
     return P.labels[code] ? code : 'en';
   }
 
+  const PHRASE_FILLS = { Expression: 'selection', SourceTitle: 'webTitle', SourceURL: 'webUrl' };
+
   function defaultActions(language = DEFAULT_TARGET_LANGUAGE) {
     const loc = presetLocale(language);
     const L = P.labels[loc];
     const text = (b) => b.text[loc] || b.text.en;
+    const lite = (b, fills) => ({
+      systemPrompt: text(b.lite).systemPrompt,
+      prompt: b.lite.prompt,
+      outputSchema: schema(b.lite.fields, text(b.lite).fields, fills),
+      layout: b.lite.layout(L),
+    });
     return [
       {
         id: 'phrase-in-context',
@@ -166,8 +174,10 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
         shortcut: P.phrase.shortcut,
         systemPrompt: text(P.phrase).systemPrompt,
         prompt: P.phrase.prompt,
-        outputSchema: schema(P.phrase.fields, text(P.phrase).fields, { SourceTitle: 'webTitle', SourceURL: 'webUrl' }),
+        // 表达就是划选的文字，由插件直接填写；交给 AI 时它常会补全或扩写，卡片就不是你划的那部分了
+        outputSchema: schema(P.phrase.fields, text(P.phrase).fields, PHRASE_FILLS),
         layout: P.phrase.layout(L),
+        lite: lite(P.phrase, PHRASE_FILLS),
         autoAddToAnki: false,
         anki: {
           deck: 'Phrase Collector::Phrases',
@@ -196,6 +206,7 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
         prompt: P.sentence.prompt,
         outputSchema: schema(P.sentence.fields, text(P.sentence).fields, { SourceURL: 'webUrl' }),
         layout: P.sentence.layout(L),
+        lite: lite(P.sentence, { SentenceEN: 'selection', SourceURL: 'webUrl' }),
         autoAddToAnki: false,
         anki: {
           deck: 'Phrase Collector::Sentences',
@@ -249,7 +260,7 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
   }
 
   const PROVIDER_PRESETS = [
-    { key: 'deepseek', name: 'DeepSeek', type: 'openai', baseURL: 'https://api.deepseek.com', model: 'deepseek-chat' },
+    { key: 'deepseek', name: 'DeepSeek', type: 'openai', baseURL: 'https://api.deepseek.com', model: 'deepseek-flash' },
     { key: 'openai', name: 'OpenAI', type: 'openai', baseURL: 'https://api.openai.com/v1', model: '' },
     { key: 'openrouter', name: 'OpenRouter', type: 'openai', baseURL: 'https://openrouter.ai/api/v1', model: '' },
     { key: 'siliconflow', name: '硅基流动 SiliconFlow', type: 'openai', baseURL: 'https://api.siliconflow.cn/v1', model: '' },
@@ -274,6 +285,7 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
         toolbarTrigger: 'auto', // auto：划词后显示工具栏；shortcut：仅快捷键
         toolbarStyle: 'standard', // standard：图标 + 名称 + 快捷键；lite：只显示图标
         cacheResults: true, // 同一页面再次划选同一内容时直接显示上次结果
+        promptMode: 'full', // full：完整解析；lite：内置动作用简版提示词，省 Token
         sourceLanguage: '', // 原文语言，空值表示自动识别
         targetLanguage: DEFAULT_TARGET_LANGUAGE, // 解释语言
         maxContextChars: 2000,
@@ -286,7 +298,7 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
           type: 'openai',
           baseURL: 'https://api.deepseek.com',
           apiKey: '',
-          model: 'deepseek-chat',
+          model: 'deepseek-flash',
           temperature: 0.3,
           jsonMode: true,
         },
@@ -328,6 +340,9 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
       outputSchema: Array.isArray(a.outputSchema) ? a.outputSchema : [],
       anki: { ...blankAnki, ...(a.anki || {}) },
     }));
+    for (const a of cfg.actions) if (a.builtin && !a.lite) a.lite = builtinDefaults(a.builtin, cfg.general.targetLanguage)?.lite;
+    // 要在 localizeBuiltins 之前：它会把旧默认说明同步成新默认（空），之后就认不出旧版了
+    for (const a of cfg.actions) fillExpressionFromSelection(a);
     localizeBuiltins(cfg);
     cfg.version = CONFIG_VERSION;
     setLang(cfg.general.uiLanguage);
@@ -350,23 +365,31 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
   }
 
   // 内置动作中随解释语言切换的内容。值仍是某个版本的默认值（未改动过）时，换成当前解释语言的默认值；改过的保留
-  const LOCALIZED_KEYS = {
-    systemPrompt: (a) => a.systemPrompt,
-    prompt: (a) => a.prompt,
-    layout: (a) => a.layout,
-    front: (a) => a.anki.front,
-    back: (a) => a.anki.back,
+  // 完整版在动作本身，简版在 action.lite，卡片模板在 action.anki
+  const PARTS = {
+    full: (a) => a,
+    lite: (a) => a.lite,
+    anki: (a) => a.anki,
   };
-  const assign = { front: (a, v) => (a.anki.front = v), back: (a, v) => (a.anki.back = v) };
+  const PART_KEYS = { full: ['systemPrompt', 'prompt', 'layout'], lite: ['systemPrompt', 'prompt', 'layout'], anki: ['front', 'back'] };
 
-  // 旧版默认值的指纹：1.0.0（只支持英语原文、固定输出简体中文）和多语言版首版
+  // 旧版默认值的指纹：1.0.0（只支持英语原文、固定输出简体中文）、多语言版首版，以及 1.1.2 之前由 AI 填写表达的版本
   const LEGACY_DEFAULTS = {
     phrase: {
+      // 整组输出字段：1.1.2 之前（表达由 AI 填写）
+      schema: ['2b4wechq9i4', '85g1a2evmf'],
       systemPrompt: ['1w99r3o5ggc', '28y2gg08plh'],
       prompt: ['1gytvibtvha', 'j8sbfsoxh7'],
-      back: ['24owkj520sz'],
+      // 背面：1.0.0 版，以及加入短语译文前 8 种语言的版本
+      back: ['24owkj520sz', '15pf5vkzyce', 'cgi0bduoae', '1dy3mci3ggi', 'exb20rejaw', 'zdpz9nnl1m', '2cvmrxudq81', '26bryupwlo5', '6pa58yz004'],
+      // 简版首版（没有译文）。schema 是整组输出字段的指纹，匹配时整组换成新版（会加上新字段）
+      lite: {
+        systemPrompt: ['1b9j85jixso', '17npb1b0xcq'],
+        layout: ['qie3pn1m59', '1t3ky4ib21z', '1d4dx4re9ca', '29uarngogbl', '1wwneqz9ka5', '3tq541tixs', '113qc5j3idx', '2830klyns03'],
+        schema: ['1c9dh5iylbl', 'etad0o7bns', 's3x7qlvudc', '1fx3z7igqfg'],
+      },
       fields: {
-        Expression: ['1pfmpkt8b8x', '2q3ik6oabc'],
+        Expression: ['1pfmpkt8b8x', '2q3ik6oabc', '1r2t4pwb0pz', 'bg4hwiw6ta', '23x1ukr9imi'],
         MeaningZH: ['1ljihoqkprh', '1yhfar8ygjy'],
         ContextEN: ['26daqsbcy4e', '1d30m9o1sj3'],
         ContextZH: ['1mpkc3fl6ds', '1vcguqb40lb'],
@@ -377,6 +400,11 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
     sentence: {
       systemPrompt: ['qbvz89ejpk', 'a8omm9h6p4'],
       prompt: ['xtjwlavvss', '1h4v1jt9tiv'],
+      lite: {
+        systemPrompt: ['7aw4aa2oej', 'j5kudmuo9j'],
+        layout: ['ybvrln1lkb', 'd8gvytbyn7', '1ehrapssxp1', 'jigyc2g3ja', 'h6gdq55bbp', 'y16pea8s9t', '1z4jby3ouz6', 'jwry6lw62p'],
+        schema: ['2g9nsqyn4nf', '1a4bbdytcqd'],
+      },
       fields: {
         SentenceEN: ['15566ufwrfn', '4vuokf823l'],
         SentenceZH: ['10si4o3mc0u', '13y7rv23as1'],
@@ -389,21 +417,36 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
     },
   };
 
+  // 整组输出字段的指纹（字段名、填写方式、说明）
+  const schemaHash = (schema) => hashString(JSON.stringify((schema || []).map((f) => [f.name, f.fill, f.description])));
+
   let knownDefaults;
-  // 每个内置动作、每项内容所有版本默认值的指纹集合
+  // 每个内置动作、每项内容所有版本默认值的指纹集合：{ phrase: { full: { systemPrompt: Set, schemas: Set, fields: { Name: Set } }, lite: …, anki: … } }
   function getKnownDefaults() {
     if (knownDefaults) return knownDefaults;
     knownDefaults = {};
+    const sets = (builtin, part) => {
+      const b = (knownDefaults[builtin] ||= {});
+      return (b[part] ||= { fields: {}, schemas: new Set() });
+    };
     for (const [builtin, legacy] of Object.entries(LEGACY_DEFAULTS)) {
-      const known = (knownDefaults[builtin] = { fields: {} });
-      for (const key of Object.keys(LOCALIZED_KEYS)) known[key] = new Set(legacy[key] || []);
-      for (const [name, hashes] of Object.entries(legacy.fields)) known.fields[name] = new Set(hashes);
+      for (const [part, keys] of Object.entries(PART_KEYS)) {
+        const known = sets(builtin, part);
+        const src = part === 'lite' ? legacy.lite || {} : legacy;
+        for (const key of keys) known[key] = new Set(src[key] || []);
+        if (part !== 'anki') for (const h of src.schema || []) known.schemas.add(h);
+      }
+      for (const [name, hashes] of Object.entries(legacy.fields)) sets(builtin, 'full').fields[name] = new Set(hashes);
     }
     for (const loc of Object.keys(P.labels)) {
       for (const def of defaultActions(loc)) {
-        const known = knownDefaults[def.builtin];
-        for (const [key, get] of Object.entries(LOCALIZED_KEYS)) known[key].add(hashString(get(def)));
-        for (const f of def.outputSchema) if (f.description) (known.fields[f.name] ||= new Set()).add(hashString(f.description));
+        for (const [part, keys] of Object.entries(PART_KEYS)) {
+          const src = PARTS[part](def);
+          const known = sets(def.builtin, part);
+          for (const key of keys) known[key].add(hashString(src[key] || ''));
+          if (src.outputSchema) known.schemas.add(schemaHash(src.outputSchema));
+          for (const f of src.outputSchema || []) if (f.description) (known.fields[f.name] ||= new Set()).add(hashString(f.description));
+        }
       }
     }
     return knownDefaults;
@@ -413,13 +456,37 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
     const known = action.builtin && getKnownDefaults()[action.builtin];
     if (!known) return action;
     const def = builtinDefaults(action.builtin, language);
-    for (const [key, get] of Object.entries(LOCALIZED_KEYS)) {
-      const cur = get(action) || '';
-      if (cur !== get(def) && known[key].has(hashString(cur))) (assign[key] || ((a, v) => (a[key] = v)))(action, get(def));
+    for (const [part, keys] of Object.entries(PART_KEYS)) {
+      const cur = PARTS[part](action);
+      const want = PARTS[part](def);
+      if (!cur || !want) continue;
+      for (const key of keys) {
+        if ((cur[key] || '') !== want[key] && known[part][key].has(hashString(cur[key] || ''))) cur[key] = want[key];
+      }
+      // 整组字段都是某个版本的默认值：整组换成当前版本（可能增减字段）
+      if (cur.outputSchema && want.outputSchema && known[part].schemas.has(schemaHash(cur.outputSchema))) {
+        if (schemaHash(cur.outputSchema) !== schemaHash(want.outputSchema)) cur.outputSchema = want.outputSchema.map((f) => ({ ...f }));
+        continue;
+      }
+      for (const f of cur.outputSchema || []) {
+        const d = want.outputSchema?.find((x) => x.name === f.name)?.description;
+        if (d != null && f.description !== d && known[part].fields[f.name]?.has(hashString(f.description || ''))) f.description = d;
+      }
     }
-    for (const f of action.outputSchema) {
-      const d = def.outputSchema.find((x) => x.name === f.name)?.description;
-      if (d != null && f.description !== d && known.fields[f.name]?.has(hashString(f.description || ''))) f.description = d;
+    return action;
+  }
+
+  // 内置短语动作的表达仍是旧版默认（由 AI 填写、说明没改过）时，改为直接填写划选的文字。
+  // 其他字段改过时整组字段不会被替换，所以单独处理这一项；用户自己改过说明的不动。
+  function fillExpressionFromSelection(action) {
+    if (action.builtin !== 'phrase') return action;
+    const legacy = new Set(LEGACY_DEFAULTS.phrase.fields.Expression);
+    for (const schema of [action.outputSchema, action.lite?.outputSchema]) {
+      const f = (schema || []).find((x) => x.name === 'Expression');
+      if (f && (f.fill || 'ai') === 'ai' && legacy.has(hashString(f.description || ''))) {
+        f.fill = 'selection';
+        f.description = '';
+      }
     }
     return action;
   }
@@ -443,9 +510,69 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
     return defaultActions(language).find((a) => a.builtin === builtin);
   }
 
+  // 简版模式下的段落上限：语境释义只需要附近一两句
+  const LITE_CONTEXT_CHARS = 600;
+
+  // 简版模式下，有简版的动作改用简版的提示词、输出字段和面板布局；Anki 设置（牌组、笔记类型、模板）共用
+  function effectiveAction(cfg, action) {
+    if (cfg?.general.promptMode !== 'lite' || !action?.lite) return action;
+    return { ...action, ...action.lite, isLite: true };
+  }
+
   // ---------------------------------------------------------------------------
   // 工具函数
   // ---------------------------------------------------------------------------
+  // 划选的文字在一段文字（如 AI 抄录的原句）中的位置，返回 { start, end } 或 null。
+  // 引号、破折号和空白的写法可以不同；英文等有空格的文字按单词边界匹配，不会落在单词内部；
+  // 出现多次时，取前文与划选处前文最吻合的一处。
+  const WORD_CHAR = /[\p{Script=Latin}\p{Script=Greek}\p{Script=Cyrillic}\p{N}]/u;
+  const LOOSE_CHARS = [[/['‘’`´]/, "['‘’`´]"], [/["“”„«»]/, '["“”„«»]'], [/[-‐‑‒–—]/, '[-‐‑‒–—]']];
+
+  function loosePattern(term) {
+    let out = '';
+    for (const ch of term) {
+      if (/\s/.test(ch)) {
+        if (!out.endsWith('\\s+')) out += '\\s+';
+        continue;
+      }
+      const loose = LOOSE_CHARS.find(([re]) => re.test(ch));
+      out += loose ? loose[1] : ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+    return out;
+  }
+
+  function findSelection(text, term, before = '') {
+    const t = String(term ?? '').trim();
+    if (!text || t.length < 2) return null;
+    const pattern = loosePattern(t);
+    const atBoundary = (m) => {
+      const first = m[0][0];
+      const last = m[0][m[0].length - 1];
+      const prev = text[m.index - 1];
+      const next = text[m.index + m[0].length];
+      return !(prev && WORD_CHAR.test(prev) && WORD_CHAR.test(first)) && !(next && WORD_CHAR.test(next) && WORD_CHAR.test(last));
+    };
+    const squash = (s) => s.replace(/\s+/g, '').toLowerCase();
+    const want = squash(before);
+    const agreement = (m) => {
+      const have = squash(text.slice(0, m.index));
+      let n = 0;
+      while (n < want.length && n < have.length && want[want.length - 1 - n] === have[have.length - 1 - n]) n++;
+      return n;
+    };
+    // 前文吻合的程度优先；单词内部的位置只在前文确实对得上（至少 3 个字符）时才算
+    for (const flags of ['gu', 'giu']) {
+      const found = [...text.matchAll(new RegExp(pattern, flags))]
+        .map((m) => ({ m, a: agreement(m), b: atBoundary(m) }))
+        .filter((x) => x.b || x.a >= 3);
+      if (!found.length) continue;
+      let best = found[0];
+      for (const x of found.slice(1)) if (x.a > best.a || (x.a === best.a && x.b && !best.b)) best = x;
+      return { start: best.m.index, end: best.m.index + best.m[0].length };
+    }
+    return null;
+  }
+
   function uid() {
     return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36);
   }
@@ -1016,6 +1143,7 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
   }
 
   globalThis.PC = {
+    findSelection,
     ICON_LIBRARY,
     EMOJI_LIBRARY,
     iconNode,
@@ -1041,6 +1169,8 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
     defaultConfig,
     defaultActions,
     builtinDefaults,
+    effectiveAction,
+    LITE_CONTEXT_CHARS,
     newAction,
     autoAnkiTemplates,
     normalizeConfig,
