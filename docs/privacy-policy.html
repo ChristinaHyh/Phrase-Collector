@@ -1,26 +1,127 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Phrase Collector Privacy Policy · 隐私政策</title>
-<style>
-  :root { --fg: #2b2f3a; --muted: #6b7080; --line: #e4e2dc; --bg: #fbfaf7; --accent: #5d6a8f; }
-  @media (prefers-color-scheme: dark) { :root { --fg: #e6e7ec; --muted: #a2a6b4; --line: #33364a; --bg: #1c1d26; --accent: #a9b4d8; } }
-  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.75 -apple-system, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", sans-serif; }
-  main { max-width: 720px; margin: 0 auto; padding: 48px 20px 80px; }
-  h1 { font: 600 30px/1.25 Georgia, serif; margin: 0 0 6px; }
-  h2 { font-size: 19px; margin: 34px 0 8px; }
-  .meta { color: var(--muted); font-size: 14px; }
-  nav a, a { color: var(--accent); }
-  hr { border: 0; border-top: 1px solid var(--line); margin: 56px 0; }
-  li { margin: 4px 0; }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Phrase Collector browser extension privacy policy. Read how local data, optional AI services, AnkiConnect and audio are handled.">
+  <title>Privacy Policy · Phrase Collector</title>
+  <style>
+    :root {
+      /* Phrase Collector's dusk palette, adapted for a quiet editorial page. */
+      --paper: #f5f3f2;
+      --surface: #fffdfb;
+      --ink: #30374b;
+      --soft: #6c7186;
+      --rule: #e7e4eb;
+      --accent: #5d6a8f;
+      --focus: #838cac;
+      --accent-soft: #eceef6;
+      --c1: #e6b8b5; --c2: #b8cbda; --c3: #d7cee7;
+      --c4: #c0ccae; --c5: #a9cdc6; --c6: #ebc86c;
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --paper: #202431;
+        --surface: #272d3d;
+        --ink: #e8e9f1;
+        --soft: #b0b5c9;
+        --rule: #41475a;
+        --accent: #bac6e9;
+        --focus: #a9a7cf;
+        --accent-soft: #343d55;
+        --c1: #d7a6aa; --c2: #91b9d0; --c3: #baa9d3;
+        --c4: #a6b99a; --c5: #8cb9b1; --c6: #d6b868;
+        color-scheme: dark;
+      }
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(ellipse 60% 35% at 100% 0%, color-mix(in srgb, var(--c3) 17%, transparent), transparent),
+        radial-gradient(ellipse 45% 30% at 0% 100%, color-mix(in srgb, var(--c1) 10%, transparent), transparent),
+        var(--paper);
+      background-attachment: fixed;
+      color: var(--ink);
+      font: 15px/1.85 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    ::selection { background: color-mix(in srgb, var(--c3) 65%, transparent); }
+    main { max-width: 754px; padding: 52px 32px 100px; margin: 0 auto; }
+    .top {
+      position: relative;
+      display: flex; align-items: center; justify-content: space-between; gap: 20px;
+      border-bottom: 1px solid var(--rule);
+      padding: 20px 0 24px; margin-bottom: 52px;
+    }
+    .top::before {
+      content: ""; position: absolute; left: 0; top: 0;
+      width: 144px; height: 4px; border-radius: 12px;
+      background: linear-gradient(90deg, var(--c1) 0 16.66%, var(--c2) 16.66% 33.33%, var(--c3) 33.33% 50%, var(--c4) 50% 66.66%, var(--c5) 66.66% 83.33%, var(--c6) 83.33% 100%);
+    }
+    .wordmark {
+      color: var(--ink); text-decoration: none;
+      font: 600 14px/1.4 Georgia, "Noto Serif SC", "Songti SC", serif;
+      letter-spacing: .012em;
+    }
+    .wordmark:hover { color: var(--accent); }
+    .lang { color: var(--soft); font-size: 12px; white-space: nowrap; }
+    .lang a { text-decoration: none; padding: 5px 2px; }
+    .lang .sep { padding: 0 7px; color: var(--soft); opacity: .6; }
+    h1 {
+      margin: 0 0 10px;
+      font: 400 37px/1.28 Georgia, "Noto Serif SC", "Songti SC", serif;
+      letter-spacing: -.025em;
+    }
+    .meta { color: var(--soft); font-size: 12px; letter-spacing: .025em; margin: 0 0 32px; }
+    h2 {
+      font: 600 17px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", "PingFang SC", sans-serif;
+      letter-spacing: -.01em; margin: 37px 0 10px;
+    }
+    p { margin: 0 0 15px; }
+    ul { margin: 8px 0 17px; padding-left: 21px; }
+    li { padding-left: 3px; margin-bottom: 7px; }
+    li::marker { color: var(--accent); }
+    a { color: var(--accent); text-underline-offset: 3px; text-decoration-thickness: 1px; }
+    a:hover { text-decoration: underline; }
+    a:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; border-radius: 2px; }
+    code {
+      font: .9em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: var(--accent); background: var(--accent-soft);
+      padding: 2px 5px; border-radius: 5px; overflow-wrap: anywhere;
+    }
+    .divider { border: none; border-top: 1px solid var(--rule); margin: 70px 0 60px; }
+    .foot {
+      margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--rule);
+      color: var(--soft); font-size: 12px;
+    }
+    .foot a { text-decoration: none; }
+    #chinese, #english { scroll-margin-top: 28px; }
+    @media (max-width: 600px) {
+      main { padding: 24px 22px 68px; }
+      .top { padding: 18px 0 20px; margin-bottom: 38px; }
+      .top::before { width: 120px; height: 3px; }
+      h1 { font-size: 31px; }
+      body { font-size: 14px; line-height: 1.8; }
+      h2 { font-size: 16px; margin-top: 30px; }
+      .divider { margin: 54px 0 44px; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  </style>
 </head>
 <body>
-<main>
-<h1>Phrase Collector 隐私政策</h1>
-<p class="meta">生效日期：2026 年 10 月 30 日 · <a href="#english">English</a></p>
+  <main>
+    <header class="top">
+      <a class="wordmark" href="https://github.com/ChristinaHyh/Phrase-Collector">Phrase Collector</a>
+      <nav class="lang" aria-label="Language / 语言"><a href="#chinese" lang="zh-CN">中文</a><span class="sep">/</span><a href="#english" lang="en">English</a></nav>
+    </header>
+
+    <section id="chinese" lang="zh-CN" aria-labelledby="title-zh">
+<h1 id="title-zh">隐私政策</h1>
+<p class="meta">生效日期：2026 年 10 月 30 日</p>
 
 <p>Phrase Collector 是一个浏览器扩展：你在网页上选中文字后，它用你自己配置的 AI 服务解析内容，并可通过 AnkiConnect 制作成 Anki 卡片。本扩展没有服务端，开发者不会收集、存储或接收你的任何数据。</p>
 
@@ -51,10 +152,12 @@
 
 <h2>联系</h2>
 <p>有任何问题，请联系：<a href="mailto:me@hyahui.com">me@hyahui.com</a></p>
+    </section>
 
-<hr>
+    <hr class="divider">
 
-<h1 id="english">Phrase Collector Privacy Policy</h1>
+    <section id="english" lang="en" aria-labelledby="title-en">
+<h1 id="title-en">Privacy Policy</h1>
 <p class="meta">Effective date: October 30, 2026</p>
 
 <p>Phrase Collector is a browser extension. When you select text on a web page, it explains the text using an AI provider you configure and can turn the result into an Anki card through AnkiConnect. The extension has no server. The developer does not collect, store or receive any of your data.</p>
@@ -86,6 +189,8 @@
 
 <h2>Contact</h2>
 <p>Questions: <a href="mailto:me@hyahui.com">me@hyahui.com</a></p>
-</main>
+    </section>
+    <footer class="foot">© 2026 Phrase Collector · <a href="#chinese">返回顶部 / Back to top</a></footer>
+  </main>
 </body>
 </html>
