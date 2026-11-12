@@ -23,194 +23,158 @@
 
 ## 中文
 
-Phrase Collector 是一个 Chrome 扩展，面向阅读外语材料的学习者。在网页上选中一个表达或长句（英语、西班牙语、日语等任何语言），插件把它连同所在段落发给你自己配置的 AI，按你定义的字段返回结构化解析，再一键通过 AnkiConnect 做成带发音的 Anki 卡片。
+Phrase Collector 是给读外语材料的人用的 Chrome 扩展。在网页上选中一个表达或长句（任何语言），它会连同所在段落发给你自己配置的 AI，按语境给出解析，再一键做成带发音的 Anki 卡片。
 
-纯原生 JavaScript，无需构建，无第三方依赖，也没有服务端：API Key 只保存在本机，请求直接发往你填写的接口。
+没有服务端，API Key 只存在本机，请求直接发往你填写的接口。
 
 ### 功能
 
-- **自带 API Key 的 AI 划词**：支持任意 OpenAI 兼容接口（DeepSeek、OpenAI、OpenRouter、硅基流动、Kimi、通义千问、智谱、火山方舟、Ollama 等），以及 Anthropic Claude 和 Google Gemini。流式输出，结果边生成边显示，也兼容推理模型。
-- **自定义划词动作**：每个动作有自己的 System Prompt、User Prompt、输出字段（JSON）、面板布局（HTML + Liquid 语法）、快捷键和牌组。内置两个动作：
-  - 💬 **Phrase in Context**（`Alt+Z`）：解析表达在当前语境中的含义、语感和可迁移句型。
-  - 🧩 **Sentence Decode**（`Shift+Z`）：拆解长难句的主干、意群、逻辑和阅读难点。
-- **一键制作 Anki 卡片**：自动创建并维护笔记类型，正反面模板已设计好；也可以映射到你已有的笔记类型。网页标题和链接由插件直接写入卡片，不交给 AI，避免编造。
-- **卡片发音**：使用 Anki 内置 TTS（可指定语音和语速），或下载有道 / Google 在线音频写入卡片，下载失败时自动回退到 TTS。发音语言跟随划词时识别出的原文语言：英语用设置里的口音，西班牙语、日语等其他语言自动切换。
-- **网站白名单**：插件只在你指定并授权的网站上运行，也可以切换为所有网站。直接粘贴网址会自动转换成通用域名，例如 `https://www.nytimes.com/2026/…` 会变成 `*.nytimes.com`。
-- **简版解析模式**：点工具栏图标，在弹窗里可以随时在「完整」和「简版」之间切换（设置页「通用与白名单 → 解析模式」也可以）。简版下两个内置动作改用更短的提示词：Phrase in Context 只输出短语译文、语境释义、原句和原句译文；Sentence Decode 只输出整句译文和一个关键短语的译文及其在句中的含义。释义要求结合语境解释，不只是重复译文。每次调用的花费约为完整版的三分之一。简版的提示词也可以在动作编辑器里切到「简版」修改，卡片写入同一个 Anki 笔记类型。
-- **省 Token 的结果缓存**：在同一页面再次划选同一内容（同一段落）时，直接显示上次的结果，不再请求 AI；已经加入 Anki 的会显示「已添加」，如果卡片已在 Anki 中删除，会恢复为可以再次添加。点「重新生成」可以跳过缓存。修改提示词、输出字段或模型后，旧缓存自动失效。
-- **可定制的外观**：划词按钮有 Standard（图标 + 名称 + 快捷键）和 Lite（只显示图标）两种样式；每个动作的图标可以从线条图标库或 Emoji 中挑选，也可以输入文字或上传图片。
-- **中英文界面**：在「通用与白名单 → 界面语言」中切换中文 / English，设置页、划词面板、弹窗和错误提示都会跟着切换。AI 解释所用的语言由「解释语言」单独控制，内置动作和自定义动作都会使用它，可以从常用语言中选择，也可以直接输入。
-- **原文语言与解释语言**：原文语言默认自动识别，也可以在「通用与白名单 → 原文语言」中固定为一种语言，用于朗读、卡片发音和 AI 解析。切换解释语言时，内置动作没改动过的提示词、面板布局和卡片标签会一起换成对应语言：提示词有中文和英文版，面板和卡片标签支持列表中的 8 种语言（中文、English、日本語、Español、Deutsch、Français、Русский、Italiano），其他语言用英文版。你改过的部分保持不变。
-- **两套主题**：暮光 Dusk（雾蓝、粉、天蓝、紫）和湖光 Lagoon（湖绿、苔绿、金），同时作用于划词面板、设置页、弹窗、工具栏图标和 Anki 卡片。
-- **备份与迁移**：可以导出、导入配置（默认不含 API Key），也可以导入 Read Frog 配置中的自定义动作。
+- **自带 Key 的 AI**：任意 OpenAI 兼容接口（DeepSeek、OpenAI、Ollama 等），以及 Claude 和 Gemini。流式输出，支持推理模型。
+- **两个内置动作**：💬 Phrase in Context（`Alt+Z`）解析表达在语境中的含义和用法；🧩 Sentence Decode（`Shift+Z`）拆解长难句。也可以自定义动作的提示词、输出字段、面板布局、快捷键和牌组。
+- **一键制卡**：自动创建和维护 Anki 笔记类型，也可以映射到你已有的类型。划选的原文、网页标题和链接由插件直接填写，不经 AI。
+- **发音**：Anki 内置 TTS，或有道 / Google 在线音频；按原文语言自动切换。
+- **简版模式**：只输出译文和语境释义，花费约为完整版的三分之一，可在工具栏弹窗随时切换。
+- **结果缓存**：同一段落再次划选同一内容时直接显示上次的结果，不耗 Token。
+- **多语言**：解释语言可任选，内置提示词和卡片标签随之切换；界面支持中文和 English。
+- **其他**：网站白名单，两套主题（同时作用于卡片），配置备份，可导入 Read Frog 的自定义动作。
 
 ### 安装
 
-Phrase Collector 目前没有上架 Chrome 应用商店，需要以「开发者模式」加载：
-
-1. 下载本仓库（`git clone`，或在 GitHub 上点 **Code → Download ZIP** 后解压）。
-2. 打开 Chrome，进入 `chrome://extensions`，打开右上角的 **开发者模式**。
-3. 点击 **加载已解压的扩展程序**，选择包含 `manifest.json` 的文件夹。
-4. 安装后会自动打开设置页。
-
-Edge、Brave 等基于 Chromium 的浏览器也可以用同样的方式安装。
+1. 下载本仓库并解压。
+2. 打开 `chrome://extensions`，开启"开发者模式"，点"加载已解压的扩展程序"，选择含 `manifest.json` 的文件夹。Edge、Brave 等 Chromium 浏览器同样可用。
 
 ### 快速开始
 
-1. **AI 服务**：在设置页「AI 服务」中填写 API Key（默认是 DeepSeek），点「测试连接」。可以点「获取模型列表」，从下拉框中选择模型。
-2. **Anki**：打开 Anki，安装 [AnkiConnect](https://ankiweb.net/shared/info/2055492159) 插件（工具 → 插件 → 获取插件，代码 `2055492159`），然后重启 Anki。回到设置页「Anki 与发音」点「测试连接」，并在 Anki 弹出的授权窗口中点 **Yes**。
-3. **白名单**：打开你常读的网站，点浏览器工具栏中的插件图标，再点「加入白名单」，并在浏览器弹出的提示中允许访问该网站。图标上出现 `ON` 就说明已经生效，当前页面不用刷新。
+1. **AI 服务**：在设置页填写 API Key（默认 DeepSeek），点「测试连接」，再点「获取模型列表」选模型。
+2. **Anki**：安装 [AnkiConnect](https://ankiweb.net/shared/info/2055492159)（插件代码 `2055492159`）并重启 Anki，在「Anki 与发音」点「测试连接」，在 Anki 弹窗中点 **Yes**。
+3. **白名单**：在要读的网站上点工具栏图标 →「加入白名单」并允许访问。图标显示 `ON` 即生效。
 
-### 使用
+之后选中文字，点浮出的按钮或按快捷键，在结果面板底部选好牌组，点「添加到 Anki」。
 
 <p align="center"><img src="docs/screenshots/toolbar.png" width="560" alt="划词工具栏"></p>
 
-- 选中文字后，点击浮出的动作按钮，或者直接按快捷键。
-- 结果面板可以拖动。右上角依次是固定（点击页面其它位置时不关闭）、重新生成、复制和关闭；底部的喇叭按钮可以朗读，按 `Esc` 关闭面板。
-- 底部选择这次存入的牌组：点击箭头列出所有牌组，也可以直接输入新名称，修改后会记住。最后点「添加到 Anki」。
-- 在动作设置中勾选「生成完成后自动添加到 Anki」，可以省掉手动点击。
-- 再次划选同一内容时，会直接显示缓存的结果，不消耗 Token，底部会提示「已显示缓存结果（X 分钟前生成）」；想要新的解析时，点右上角的「重新生成」。
-
-### 设置说明
-
 <p align="center"><img src="docs/screenshots/settings-dusk.png" width="820" alt="设置页"></p>
 
-| 分区 | 内容 |
-| --- | --- |
-| 通用与白名单 | 界面语言、主题、生效范围、白名单规则、划词按钮（显示方式与 Standard / Lite 样式）、结果缓存、解析模式、原文语言、解释语言、上下文长度 |
-| AI 服务 | 多个服务并存；接口类型、Base URL、API Key、模型、Temperature、JSON 模式 |
-| 划词动作 | 图标、提示词、输出字段、面板布局、快捷键、牌组、标签、发音字段、笔记类型 |
-| Anki 与发音 | AnkiConnect 地址和 Key、英语 TTS 口音、语音、语速，以及在线音频来源 |
-| 备份与恢复 | 导出、导入配置，导入 Read Frog 动作，恢复默认设置 |
+### 隐私
 
-**提示词变量**：`{{selection}}` 选中文本，`{{paragraphs}}` 所在段落，`{{webTitle}}` 网页标题，`{{webUrl}}` 网页链接，`{{sourceLanguage}}` 原文语言（设置中指定时才有值，自动识别时为空），`{{targetLanguage}}` 解释语言。输出字段的 JSON 格式要求会自动追加到 System Prompt 末尾，不需要手写。
+- API Key 和设置只存在浏览器本地（`chrome.storage.local`）。
+- 划词内容只发给你配置的 AI 接口；开启在线音频时，发音文本会发给有道或 Google。
+- 划词脚本只在你授权的白名单网站上运行。
 
-**白名单规则**（每行一条，以 `#` 开头的行会被忽略）：
+### 常见问题
+
+- **划词没反应**：点工具栏图标确认网站已加入白名单并已授权，仍不行就刷新页面。Chrome 的 PDF 阅读器、`chrome://` 页面和应用商店页面无法运行扩展脚本。
+- **HTTP 400，提到 `response_format`**：该服务不支持 JSON 模式，在「AI 服务」里关掉「JSON 模式」。
+- **「模型思考中…」等得久**：在「AI 服务」里把「思考」设为「关闭」；不支持这个开关的模型报 400 时，改为「服务默认」。
+- **Ollama**：用 `OLLAMA_ORIGINS=chrome-extension://*` 启动，API Key 留空。在别的电脑上时，那台电脑还要设 `OLLAMA_HOST=0.0.0.0`，Base URL 改成它的地址（如 `http://192.168.1.20:11434/v1`）。
+- **连不上 AnkiConnect**：保持 Anki 打开；AnkiConnect 设了 apiKey 时，插件里要填同样的 Key。
+- **卡片已存在**：同一牌组首字段重复时默认拒绝，点面板底部「允许重复添加」即可。
+- **开着 Read Frog**：双语模式下译文不会混进划词内容；只显示译文的模式下拿到的是译文，请切回双语模式。
+
+<details>
+<summary>提示词变量、白名单规则、默认笔记类型</summary>
+
+**提示词变量**：`{{selection}}` 选中文本，`{{paragraphs}}` 所在段落，`{{webTitle}}`、`{{webUrl}}` 网页标题和链接，`{{sourceLanguage}}` 原文语言（自动识别时为空），`{{targetLanguage}}` 解释语言。输出字段的 JSON 格式要求会自动追加到 System Prompt。
+
+**白名单规则**（每行一条，`#` 开头为注释）：
 
 | 写法 | 匹配 |
 | --- | --- |
-| `*.example.com` 或 `example.com` | 该域名及其全部子域名 |
-| `https://x.com/*/status/*` | 用通配符匹配完整网址 |
-| `/regex/` | 用正则表达式匹配完整网址 |
+| `*.example.com` 或 `example.com` | 该域名及全部子域名 |
+| `https://x.com/*/status/*` | 带通配符的完整网址 |
+| `/regex/` | 正则表达式匹配完整网址 |
 
-### 默认 Anki 笔记类型
+**默认笔记类型**：
 
 | 动作 | 笔记类型 | 字段 |
 | --- | --- | --- |
 | Phrase in Context | `Phrase Collector · Phrase` | Expression, MeaningZH, ContextEN, ContextZH, NuanceZH, PatternEN, SourceTitle, SourceURL, Audio |
 | Sentence Decode | `Phrase Collector · Sentence` | SentenceEN, SentenceZH, Core, Chunks, LogicZH, HardPartZH, Takeaways, SourceURL, Audio |
 
-- `Expression` 就是你划选的文字，由插件直接填写，不交给 AI，所以卡片正面不会被 AI 补全或扩写。`ContextEN`（原句）里只标出你划选的那一处。如果想让 AI 改写，可以在动作的输出字段里把 `Expression` 的填写方式改回「AI 生成」。
-- 卡片模板可以在「划词动作 → Anki 卡片 → 卡片模板（高级）」中修改，`[[TTS]]` 是发音占位符。
-- 在托管模式下，Anki 里的模板以插件中的设置为准。修改发音设置后，点「同步模板到 Anki」即可更新已有卡片。
-- 模板里用到、但输出字段中没有的字段，会自动加到笔记类型里，避免 Anki 报「未找到字段」。
-- 卡片配色跟随插件主题：暮光是紫色系，湖光是绿色系，也支持 Anki 夜间模式。切换主题时如果 Anki 开着，已有卡片会一起换色，否则下次制卡时更新。自定义 CSS 里可以用 `var(--pc-*)` 引用这些颜色。
-- Phrase 卡片背面的「语感」和「可迁移表达」默认折叠，点标题展开。
+卡片模板在「划词动作 → Anki 卡片 → 卡片模板（高级）」中修改，`[[TTS]]` 是发音占位符。插件管理的笔记类型以插件中的模板为准，改了发音设置后点「同步模板到 Anki」。
 
-### 隐私
+</details>
 
-- API Key 和全部设置只保存在浏览器本地（`chrome.storage.local`），不会上传到任何地方。
-- 划词内容只发送给你配置的 AI 接口。只有在开启「在线音频」时，才会把发音文本发送给有道或 Google。
-- 划词脚本只注入到白名单中你授权过的网站，其他网站不运行任何代码。切换为「所有网站」时需要另外授权访问所有网站。
-- 安装时只申请这些固定地址的访问权限：常用 AI 服务商的接口（DeepSeek、OpenAI、OpenRouter、硅基流动、Kimi、通义千问、智谱、火山方舟、Anthropic、Google Gemini）、本机地址（AnkiConnect 和 Ollama），以及有道和 Google 的发音服务。填写其他接口地址时，点「测试连接」会单独申请该地址的权限。
+<details>
+<summary>项目结构</summary>
 
-### 常见问题
-
-- **划词没有反应**：点工具栏图标，确认当前网站已在白名单中并已授权（未授权时会显示「授权此网站」按钮）。如果图标上有 `ON` 仍然没反应，刷新一下页面。Chrome 内置的 PDF 阅读器、`chrome://` 页面和应用商店页面无法注入脚本。
-- **报 HTTP 400，并提到 response_format**：这个服务不支持 JSON 模式，在「AI 服务」中关闭「JSON 模式」即可。
-- **推理模型**（如 `deepseek-reasoner`）：可以使用，生成前面板会显示「模型思考中…」。Temperature 建议留空。
-- **Ollama**：需要先设置环境变量 `OLLAMA_ORIGINS=chrome-extension://*`，再启动 Ollama。在「AI 服务」中添加 Ollama 预设，API Key 留空，点「获取模型列表」选择模型即可。Ollama 在局域网或 Tailscale 里的另一台电脑上时，那台电脑要用 `OLLAMA_HOST=0.0.0.0` 启动 Ollama（默认只监听本机），再把 Base URL 改成它的地址（如 `http://192.168.1.20:11434/v1` 或 `http://100.101.102.103:11434/v1`），点「测试连接」授权，API Key 同样留空。
-- **连接不到 AnkiConnect**：Anki 需要保持打开。如果在 AnkiConnect 中设置了 apiKey，在插件里也要填写同样的 Key。
-- **提示「尚未授权访问 …」**：你填写的接口地址不在预先授权的列表里，在对应设置分区点「测试连接」并允许访问即可。
-- **开着 Read Frog 等网页翻译**：划词面板标记了不翻译，不会被翻译。Read Frog 双语模式插入的译文也不会混进选中文字和上下文。如果用的是只显示译文的模式，原文已被替换，划词拿到的就是译文，这时请切回双语模式。
-- **卡片已存在**：默认会拒绝同一牌组中首字段重复的卡片。可以点划词面板底部的「允许重复添加」按钮（或报错提示里的「允许重复并添加」），也可以在动作设置中开启；开启后同一结果可以「再添加一张」。
-
-### 项目结构
+纯原生 JavaScript，无需构建，无第三方依赖。改完代码后在 `chrome://extensions` 点刷新，再刷新网页。
 
 ```
-manifest.json              MV3 清单
-_locales/                  扩展描述的中英文（随浏览器语言切换）
-background.js              AI 流式请求、AnkiConnect、在线音频、笔记类型同步、主题图标、按白名单注册划词脚本
-content/content.js         划词工具栏与结果面板（Shadow DOM 隔离样式）
-options/                   设置页
-popup/                     工具栏弹窗（白名单开关与网站授权、状态检查）
-shared/core.js             默认配置、主题、界面语言、迷你 Liquid 模板引擎、宽松 JSON 解析、白名单匹配与网站授权、原文语言代码
-shared/i18n.js             界面英文对照表
-shared/default-prompts.js  内置两个动作的提示词
-icons/                     暮光 / 湖光两套图标（SVG 与 PNG）
+background.js              AI 流式请求、AnkiConnect、在线音频、笔记类型同步、注册划词脚本
+content/content.js         划词工具栏与结果面板（Shadow DOM）
+options/  popup/           设置页、工具栏弹窗
+shared/core.js             默认配置、主题、Liquid 模板引擎、JSON 解析、白名单匹配
+shared/i18n.js             界面英文对照
+shared/default-prompts.js  内置动作的提示词
 ```
 
-修改代码后，在 `chrome://extensions` 中点扩展卡片上的刷新按钮，再刷新网页即可。
+</details>
 
 ### 致谢
 
-划词指令的设计参考了 [Read Frog](https://github.com/mengxi-ream/read-frog)，Anki 制卡流程参考了 [ODH (Online Dictionary Helper)](https://github.com/ninja33/ODH)，卡片写入依赖 [AnkiConnect](https://git.sr.ht/~foosoft/anki-connect)。
+划词动作的设计参考了 [Read Frog](https://github.com/mengxi-ream/read-frog)，制卡流程参考了 [ODH](https://github.com/ninja33/ODH)，卡片通过 [AnkiConnect](https://git.sr.ht/~foosoft/anki-connect) 写入。
 
 ---
 
 ## English
 
-Phrase Collector is a Chrome extension for language learners who read foreign-language material. Select an expression or a long sentence in any language (English, Spanish, Japanese…); the extension sends it, together with its surrounding paragraph, to the AI provider *you* configure, gets back a structured analysis in the fields *you* define, and turns it into an Anki card with audio through AnkiConnect in one click.
+Phrase Collector is a Chrome extension for people reading in a foreign language. Select an expression or a long sentence in any language; it goes, with its paragraph, to the AI provider you configure, and the explanation in context becomes an Anki card with audio in one click.
 
-It is plain JavaScript with no build step, no third-party dependencies and no backend: your API key stays in your browser, and requests go straight to the endpoint you set.
-
-> The built-in actions work with text in any language and explain it in your *Explanation language* (Simplified Chinese by default). Their prompts, panel labels and card labels switch with it; every prompt, output field and template is editable.
+No backend: your API key stays in your browser, and requests go straight to the endpoint you set.
 
 ### Features
 
-- **Bring-your-own-key AI**: any OpenAI-compatible API (DeepSeek, OpenAI, OpenRouter, SiliconFlow, Kimi, Qwen/DashScope, Zhipu GLM, Volcengine Ark, Ollama…), plus Anthropic Claude and Google Gemini. Results stream in as they're generated, and reasoning models are supported.
-- **Custom selection actions**: each action has its own system prompt, user prompt, output fields (JSON), panel layout (HTML + Liquid), shortcut and deck. Two are built in:
-  - 💬 **Phrase in Context** (`Alt+Z`): explains an expression's meaning in context, its nuance, and a reusable pattern.
-  - 🧩 **Sentence Decode** (`Shift+Z`): breaks a long sentence into its core, chunks, logic and the part that trips readers up.
-- **One-click Anki cards**: the extension creates and maintains its own note types with ready-made templates, or maps onto a note type you already have. Page title and URL are filled in by the extension itself, never by the AI.
-- **Audio on cards**: Anki's built-in TTS (choose voice and speed), or Youdao / Google audio downloaded into the card, falling back to TTS if the download fails. The audio language follows the language detected in your selection: English uses the accent you set, and Spanish, Japanese and other languages switch automatically.
-- **Site whitelist**: the extension only runs on sites you add and grant access to (or switch to all sites). Paste a full URL and it becomes a domain pattern automatically, e.g. `https://www.nytimes.com/2026/…` → `*.nytimes.com`.
-- **Lite mode**: switch between Full and Lite at any time from the toolbar popup (or under *General & whitelist → Analysis mode*). In Lite mode the two built-in actions use shorter prompts: Phrase in Context returns only the translation of the expression, its meaning in context, the original sentence and its translation; Sentence Decode returns only the sentence translation and one key phrase with its translation and its meaning in the sentence. Explanations stay contextual rather than repeating the translation. Each call costs about a third of the full version. The lite prompts can be edited in the action editor by switching it to *Lite*, and cards go into the same Anki note type.
-- **Result cache to save tokens**: selecting the same text again on the same page (in the same paragraph) shows the previous result without calling the AI, and cards already sent to Anki show as added. If you delete the card in Anki, it can be added again. Use regenerate to bypass the cache; editing the prompt, output fields or model invalidates old entries automatically.
-- **Customizable look**: the selection toolbar comes in Standard (icon, name and shortcut) or Lite (icons only); each action's icon can come from a built-in line-icon set or emoji, or be your own text or uploaded image.
-- **Chinese / English UI**: switch under *General & whitelist → Language*. The settings page, result panel, popup and error messages all follow it. The language of AI explanations is controlled separately by *Explanation language* used by both the built-in and your own actions. Pick a common language or type any other.
-- **Source and explanation languages**: the source language is detected automatically, or you can fix it under *General & whitelist → Source language*; it is used for read-aloud, card audio and the AI analysis. When you change the explanation language, unmodified prompts, panel layouts and card labels of the built-in actions switch with it: prompts come in Chinese and English, and labels cover the 8 languages in the list (Chinese, English, Japanese, Spanish, German, French, Russian, Italian); other languages use English. Anything you've edited stays as it is.
-- **Two themes**: Dusk (slate blue, blush, sky, lavender) and Lagoon (lagoon green, moss, gold), applied to the panel, settings page, popup, toolbar icon and Anki cards.
-- **Backup & migration**: export or import your settings (API keys excluded by default), and import custom actions from a Read Frog config.
-
-<p align="center"><img src="docs/screenshots/settings-lagoon.png" width="820" alt="Settings page · Lagoon theme"></p>
+- **Bring your own key**: any OpenAI-compatible API (DeepSeek, OpenAI, Ollama…), plus Claude and Gemini. Streaming output; reasoning models supported.
+- **Two built-in actions**: 💬 Phrase in Context (`Alt+Z`) explains an expression's meaning and use in context; 🧩 Sentence Decode (`Shift+Z`) breaks down a long sentence. Write your own actions with their own prompts, output fields, panel layout, shortcut and deck.
+- **One-click cards**: note types are created and maintained for you, or mapped onto your own. The selected text, page title and URL are filled in by the extension, never by the AI.
+- **Audio**: Anki's built-in TTS, or Youdao / Google audio, following the language of the selection.
+- **Lite mode**: just the translation and the meaning in context, at about a third of the cost; switch from the toolbar popup.
+- **Result cache**: selecting the same text in the same paragraph again shows the last result without using tokens.
+- **Languages**: explanations in any language you choose, with built-in prompts and card labels to match; English and Chinese interfaces.
+- **Also**: site whitelist, two themes (cards included), settings backup, and import of Read Frog custom actions.
 
 ### Installation
 
-Phrase Collector is not on the Chrome Web Store yet, so load it in developer mode:
-
-1. Get the code: `git clone` this repository, or use **Code → Download ZIP** on GitHub and unzip it.
-2. Open `chrome://extensions` and turn on **Developer mode** (top right).
-3. Click **Load unpacked** and pick the folder that contains `manifest.json`.
-4. The settings page opens automatically.
-
-It also works in other Chromium-based browsers such as Edge and Brave.
+1. Download this repository and unzip it.
+2. Open `chrome://extensions`, turn on Developer mode, click "Load unpacked" and choose the folder with `manifest.json`. Edge, Brave and other Chromium browsers work the same way.
 
 ### Quick start
 
-1. **AI provider**: under *AI 服务* (AI providers), paste your API key (DeepSeek by default) and click *测试连接* (Test connection). Click *获取模型列表* (Fetch models) to pick a model from the dropdown.
-2. **Anki**: open Anki, install the [AnkiConnect](https://ankiweb.net/shared/info/2055492159) add-on (Tools → Add-ons → Get Add-ons, code `2055492159`), then restart Anki. Under *Anki 与发音* (Anki & audio), click *测试连接* (Test connection) and choose **Yes** in the permission dialog that Anki shows.
-3. **Whitelist**: open a site you read often, click the extension's toolbar icon, then *Add … to whitelist*, and allow access in the browser prompt. An `ON` badge on the icon means it's active; the open page doesn't need a reload.
+1. **AI provider**: on the settings page, paste your API key (DeepSeek by default), click *Test connection*, then *Fetch models* to pick a model.
+2. **Anki**: install [AnkiConnect](https://ankiweb.net/shared/info/2055492159) (add-on code `2055492159`) and restart Anki. Under *Anki & audio*, click *Test connection* and choose **Yes** in Anki's dialog.
+3. **Whitelist**: on a site you read, click the toolbar icon → *Add to whitelist* and allow access. An `ON` badge means it's active.
 
-The interface is currently in Simplified Chinese; the labels above include their meaning in parentheses.
+Then select text, click an action button or press its shortcut, choose a deck at the bottom of the panel, and click *Add to Anki*.
 
-### Usage
+<p align="center"><img src="docs/screenshots/settings-lagoon.png" width="820" alt="Settings page · Lagoon theme"></p>
 
-- Select text, then click an action button that appears, or press its shortcut.
-- The result panel can be dragged around. The top-right buttons pin it (so it stays open when you click elsewhere), regenerate, copy, and close; the speaker button at the bottom reads the expression aloud. `Esc` closes the panel.
-- Choose the deck at the bottom: click the arrow to list all your decks, or type a new name (it's remembered). Then click *添加到 Anki* (Add to Anki).
-- Enable *生成完成后自动添加到 Anki* (auto-add when done) in an action's settings to skip the click.
-- Selecting the same text again shows the cached result without using tokens, with a note at the bottom saying when it was generated. Click regenerate (top right) for a fresh analysis.
+### Privacy
 
-### Configuration
+- API keys and settings stay in your browser (`chrome.storage.local`).
+- Selected text goes only to the AI endpoint you configure; with online audio on, the text to speak goes to Youdao or Google.
+- The selection script runs only on whitelisted sites you've granted access to.
 
-**Prompt variables**: `{{selection}}`, `{{paragraphs}}`, `{{webTitle}}`, `{{webUrl}}`, `{{sourceLanguage}}` (only set when you fix the source language; empty when auto-detecting), `{{targetLanguage}}` (the explanation language). The JSON format instructions for your output fields are appended to the system prompt automatically.
+### Troubleshooting
 
-**Whitelist rules** (one per line; lines starting with `#` are ignored):
+- **Nothing happens on selection**: check from the toolbar icon that the site is whitelisted and granted, then reload the page. Chrome's PDF viewer, `chrome://` pages and the Web Store can't run extension scripts.
+- **HTTP 400 mentioning `response_format`**: the provider doesn't support JSON mode; turn off *JSON mode* for it.
+- **Long "thinking" waits**: set *Thinking* to *Off* under *AI providers*; if a model returns 400 for that, choose *Provider default*.
+- **Ollama**: start it with `OLLAMA_ORIGINS=chrome-extension://*` and leave the API key empty. On another computer, also start it with `OLLAMA_HOST=0.0.0.0` and set the Base URL to that machine (e.g. `http://192.168.1.20:11434/v1`).
+- **Can't reach AnkiConnect**: keep Anki open; if AnkiConnect has an apiKey, enter the same key in the extension.
+- **"Card already exists"**: duplicates in a deck are rejected by default; turn on *Allow duplicates* in the panel footer.
+- **Read Frog**: in bilingual mode its translations stay out of the selection; in translation-only mode the selection is the translation, so switch back to bilingual.
+
+<details>
+<summary>Prompt variables, whitelist rules, default note types</summary>
+
+**Prompt variables**: `{{selection}}`, `{{paragraphs}}`, `{{webTitle}}`, `{{webUrl}}`, `{{sourceLanguage}}` (empty when auto-detected), `{{targetLanguage}}` (the explanation language). JSON instructions for your output fields are appended to the system prompt automatically.
+
+**Whitelist rules** (one per line; `#` starts a comment):
 
 | Rule | Matches |
 | --- | --- |
-| `*.example.com` or `example.com` | the domain and all its subdomains |
+| `*.example.com` or `example.com` | the domain and all subdomains |
 | `https://x.com/*/status/*` | full URL, with wildcards |
 | `/regex/` | full URL, as a regular expression |
 
@@ -221,48 +185,26 @@ The interface is currently in Simplified Chinese; the labels above include their
 | Phrase in Context | `Phrase Collector · Phrase` | Expression, MeaningZH, ContextEN, ContextZH, NuanceZH, PatternEN, SourceTitle, SourceURL, Audio |
 | Sentence Decode | `Phrase Collector · Sentence` | SentenceEN, SentenceZH, Core, Chunks, LogicZH, HardPartZH, Takeaways, SourceURL, Audio |
 
-- `Expression` is exactly the text you selected, filled in by the extension rather than the AI, so the AI can't complete or extend it on the card. `ContextEN` (the original sentence) marks only the spot you selected. To let the AI write it instead, set `Expression` back to AI in the action's output fields.
-- Card templates are editable under the action's advanced card template settings; `[[TTS]]` is the audio placeholder.
-- For note types the extension manages, its templates take precedence over edits made in Anki. After changing audio settings, use *同步模板到 Anki* (Sync templates to Anki) to update existing cards.
-- Any field that a template references but the output fields lack is added to the note type automatically, so Anki won't reject the template.
-- Card colors follow the extension theme: purple for Dusk, green for Lagoon, with Anki night mode supported. If Anki is open when you switch themes, existing cards are recolored right away; otherwise on the next card you add. Custom CSS can use the `var(--pc-*)` color variables.
-- On the Phrase card's back, *Nuance* and *Pattern* are collapsed by default; click the heading to expand.
+Card templates are editable in each action's advanced card template settings; `[[TTS]]` is the audio placeholder. For note types the extension manages, its templates win over edits in Anki; after changing audio settings, click *Sync templates to Anki*.
 
-### Privacy
+</details>
 
-- Your API keys and all settings are stored locally in `chrome.storage.local` and never uploaded anywhere.
-- Selected text goes only to the AI endpoint you configure. Text to be spoken is sent to Youdao or Google only if you turn on online audio.
-- The selection script is injected only into whitelisted sites you've granted access to; no code runs on other sites. Switching to *All sites* asks for access to all sites separately.
-- At install time it only asks for access to fixed addresses: the APIs of common AI providers (DeepSeek, OpenAI, OpenRouter, SiliconFlow, Kimi, Qwen, Zhipu, Volcengine Ark, Anthropic, Google Gemini), your own computer (AnkiConnect and Ollama), and the Youdao and Google audio services. If you enter another API address, *Test connection* asks for access to that address on its own.
+<details>
+<summary>Project structure</summary>
 
-### Troubleshooting
-
-- **Nothing happens when I select text**: click the toolbar icon and check that the site is whitelisted and access is granted (if not, you'll see *Grant access to this site*). If the icon shows `ON` and it still doesn't work, reload the page. Chrome's built-in PDF viewer, `chrome://` pages and the Web Store can't run extension scripts.
-- **HTTP 400 mentioning `response_format`**: the provider doesn't support JSON mode. Turn off *JSON 模式* (JSON mode) for that provider.
-- **Reasoning models** (e.g. `deepseek-reasoner`): supported; the panel shows a "thinking" state first. Leave Temperature empty.
-- **Ollama**: start it with the environment variable `OLLAMA_ORIGINS=chrome-extension://*`. Add the Ollama preset under *AI providers*, leave the API key empty, and pick a model with *Fetch models*. If Ollama runs on another computer on your network or Tailscale, start it there with `OLLAMA_HOST=0.0.0.0` (by default it only listens locally), set the Base URL to that computer's address (e.g. `http://192.168.1.20:11434/v1` or `http://100.101.102.103:11434/v1`), and click *Test connection* to grant access. Leave the API key empty here too.
-- **Can't reach AnkiConnect**: keep Anki open. If you set an apiKey in AnkiConnect, enter the same key in the extension.
-- **"No access to … yet"**: the API address you entered isn't one of the pre-approved ones. Click *Test connection* in that settings section and allow access.
-- **Web page translators such as Read Frog**: the panel is marked not to be translated. Translations that Read Frog's bilingual mode inserts are left out of the selection and context. In a translation-only mode the original text has been replaced, so the selection is the translation; switch back to bilingual mode.
-- **"Card already exists"**: duplicates within a deck (same first field) are rejected by default. Toggle "Allow duplicates" in the panel footer (or click "Allow duplicate & add" in the error), or enable it per action in Settings; once on, you can "Add another" from the same result.
-
-### Project structure
+Plain JavaScript, no build step, no third-party dependencies. After editing, reload the extension in `chrome://extensions`, then reload the page.
 
 ```
-manifest.json              Manifest V3
-_locales/                  Extension description in English / Chinese (follows the browser language)
-background.js              AI streaming, AnkiConnect, online audio, note type sync, themed icon, registers the selection script for whitelisted sites
-content/content.js         Selection toolbar and result panel (isolated in Shadow DOM)
-options/                   Settings page
-popup/                     Toolbar popup (whitelist toggle and site access, status checks)
-shared/core.js             Defaults, themes, UI language, mini Liquid template engine, lenient JSON parser, whitelist matching and site access, source language codes
+background.js              AI streaming, AnkiConnect, online audio, note type sync, registering the selection script
+content/content.js         Selection toolbar and result panel (Shadow DOM)
+options/  popup/           Settings page and toolbar popup
+shared/core.js             Defaults, themes, Liquid template engine, JSON parsing, whitelist matching
 shared/i18n.js             English UI strings
-shared/default-prompts.js  Prompts for the two built-in actions
-icons/                     Dusk / Lagoon icons (SVG and PNG)
+shared/default-prompts.js  Prompts for the built-in actions
 ```
 
-After editing the code, click the reload button on the extension card in `chrome://extensions`, then reload the page.
+</details>
 
 ### Acknowledgements
 
-The custom selection actions are inspired by [Read Frog](https://github.com/mengxi-ream/read-frog), the card-making flow by [ODH (Online Dictionary Helper)](https://github.com/ninja33/ODH), and cards are written through [AnkiConnect](https://git.sr.ht/~foosoft/anki-connect).
+The selection actions are inspired by [Read Frog](https://github.com/mengxi-ream/read-frog), the card-making flow by [ODH](https://github.com/ninja33/ODH), and cards are written through [AnkiConnect](https://git.sr.ht/~foosoft/anki-connect).

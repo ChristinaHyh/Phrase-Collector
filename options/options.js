@@ -245,7 +245,8 @@ function helpHtml(html) {
 
 // 可筛选的下拉输入框，替代原生 datalist：
 // 点箭头总是列出全部选项（datalist 会按当前值过滤，值已存在时列表为空），输入时按关键字筛选
-function combo(el, getItems, { onEmpty, emptyText = tr('暂无选项') } = {}) {
+// refresh：每次展开都重新读取（如 Anki 牌组可能在别处增删），先显示现有列表，读到变化再更新
+function combo(el, getItems, { onEmpty, refresh, emptyText = tr('暂无选项') } = {}) {
   const list = h('div', { class: 'combo-list', role: 'listbox', hidden: true });
   const toggle = h('button', { type: 'button', class: 'combo-toggle', title: tr('展开列表'), tabindex: '-1' }, svgIcon(ICON_PATHS.chevron));
   const wrap = h('div', { class: 'combo' }, el, toggle, list);
@@ -295,8 +296,14 @@ function combo(el, getItems, { onEmpty, emptyText = tr('暂无选项') } = {}) {
       list.hidden = false;
       wrap.classList.add('open');
       await onEmpty();
+      open(false);
+      return;
     }
     open(false);
+    if (!refresh) return;
+    const before = JSON.stringify(getItems());
+    await refresh();
+    if (!list.hidden && JSON.stringify(getItems()) !== before) open(false);
   });
   el.addEventListener('input', (e) => e.isTrusted && open(true));
   el.addEventListener('blur', () => setTimeout(close, 120));
@@ -580,7 +587,7 @@ function renderGeneral() {
         tr('解析模式'),
         select(g, 'promptMode', [
           ['full', tr('完整')],
-          ['lite', tr('简版（省 Token）')],
+          ['lite', tr('简版')],
         ]),
         helpHtml(tr('简版只对两个内置动作生效：提示词更短，Phrase in Context 只输出短语译文、语境释义、原句和原句译文，Sentence Decode 只输出整句译文和一个关键短语的译文与解释。每次花费约为完整版的三分之一。也可以在工具栏弹窗中随时切换。'))
       ),
@@ -622,6 +629,29 @@ function renderGeneral() {
 // =============================================================================
 // AI 服务
 // =============================================================================
+// 是否让模型先思考再回答。只对支持开关的服务显示，其他服务说明原因
+function thinkingRow(p) {
+  if (!PC.supportsThinkingSwitch(p)) {
+    return row(tr('思考'), h('div', { class: 'help' }, tr('这个服务没有可以在插件里切换的思考开关，由模型自己决定。想更快出结果，可以选用不思考的模型。')));
+  }
+  return row(
+    tr('思考'),
+    dropdown(
+      [
+        ['off', tr('关闭')],
+        ['on', tr('开启')],
+        ['', tr('服务默认')],
+      ],
+      PC.thinkingOf(p),
+      (v) => {
+        p.thinking = v;
+        save();
+      }
+    ),
+    helpHtml(tr('开启后模型会先想一想再回答，等待时间更长。如果选了「关闭」或「开启」后划词报错，说明这个模型不支持切换，改成「服务默认」即可。'))
+  );
+}
+
 function renderProviders() {
   const c = content('providers');
   cfg.providers.forEach((p, idx) => {
@@ -655,13 +685,15 @@ function renderProviders() {
             ['openai', tr('OpenAI 兼容（DeepSeek / OpenAI / OpenRouter / 硅基流动 / Kimi / 通义 / 智谱 / Ollama …）')],
             ['anthropic', 'Anthropic Claude'],
             ['gemini', 'Google Gemini'],
-          ])
+          ], () => renderProviders())
         ),
         row(
           'Base URL',
           input(p, 'baseURL', {
             placeholder: 'https://api.deepseek.com',
             oninput: () => (key.placeholder = PC.needsApiKey(p) ? 'sk-...' : tr('本机模型无需填写')),
+            // 换了服务地址，思考开关是否可用也可能变
+            onchange: () => renderProviders(),
           }),
           helpHtml(tr('OpenAI 兼容接口会自动拼接 <code>/chat/completions</code>。'))
         ),
@@ -686,6 +718,7 @@ function renderProviders() {
           )
         ),
         row('Temperature', input(p, 'temperature', { type: 'number', placeholder: tr('留空使用模型默认值') }), helpHtml(tr('推理模型（如 deepseek-reasoner、o 系列）建议留空。'))),
+        thinkingRow(p),
         row(tr('JSON 模式'), checkbox(p, 'jsonMode', tr('请求结构化 JSON 输出（response_format / responseMimeType）')), helpHtml(tr('若服务商不支持该参数导致 400 错误，请关闭。Anthropic 忽略此项。'))),
         h(
           'div',
@@ -743,7 +776,7 @@ function renderProviders() {
         {
           onclick: () => {
             const p = PC.PROVIDER_PRESETS.find((x) => x.key === preset.key);
-            cfg.providers.push({ id: PC.uid(), name: tr(p.name), type: p.type, baseURL: p.baseURL, apiKey: '', model: p.model, temperature: 0.3, jsonMode: p.type !== 'anthropic' });
+            cfg.providers.push({ id: PC.uid(), name: tr(p.name), type: p.type, baseURL: p.baseURL, apiKey: '', model: p.model, temperature: 0.3, jsonMode: p.type !== 'anthropic', ...(p.thinking ? { thinking: p.thinking } : {}) });
             save();
             renderProviders();
             renderActions();
@@ -979,6 +1012,7 @@ function actionCard(a, idx) {
   // Anki
   const deck = combo(input(a.anki, 'deck', { placeholder: 'Phrase Collector::Phrases' }), () => ankiDecks, {
     onEmpty: fetchDecks,
+    refresh: fetchDecks,
     emptyText: tr('没有读取到牌组，请确认 Anki 已打开'),
   });
   const fieldOptions = [['', tr('（不发音）')], ...fieldNames.map((n) => [n, n])];

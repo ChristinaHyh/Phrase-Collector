@@ -645,12 +645,23 @@ kbd{font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-
     port.postMessage({ type: 'run', actionId: action.id, context });
   }
 
-  function loadDecks(done) {
-    if (deckCache) return done?.();
+  // Anki 增删牌组时不会通知插件，所以每次打开面板或下拉列表都重新读取一次；
+  // 读取期间先用上次的列表，读到的有变化再调用 onChange。Anki 没开时保留上次的列表。
+  let decksLoading = false;
+  function loadDecks(onChange) {
+    decksLoading = true;
     send({ type: 'anki:decks' }, (res) => {
-      if (res?.ok) deckCache = res.data;
-      done?.();
+      decksLoading = false;
+      const before = JSON.stringify(deckCache);
+      if (res?.ok && Array.isArray(res.data)) deckCache = res.data;
+      if (JSON.stringify(deckCache) !== before || !res?.ok) onChange?.();
     });
+  }
+
+  // 用新名字添加卡片时，后台会先在 Anki 里建好这个牌组，列表里也加上
+  function rememberDeck(name) {
+    if (!name || !deckCache || deckCache.includes(name)) return;
+    deckCache = [...deckCache, name].sort((a, b) => a.localeCompare(b));
   }
 
   // 牌组下拉：点箭头列出全部牌组，输入时筛选（原生 datalist 在已有值时不显示列表，且无法定制样式）
@@ -667,7 +678,11 @@ kbd{font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-
       input.dispatchEvent(new Event('change'));
       close();
     };
+    let filtering = false;
+    const emptyText = () =>
+      deckCache ? tr('没有牌组，可直接输入新名称') : decksLoading ? tr('正在读取牌组…') : tr('未连接 Anki，可直接输入牌组名称');
     const open = (filter) => {
+      filtering = filter;
       const q = filter ? input.value.trim().toLowerCase() : '';
       const decks = (deckCache || []).filter((d) => !q || d.toLowerCase().includes(q));
       if (filter && !decks.length) return close();
@@ -675,7 +690,7 @@ kbd{font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-
       list.replaceChildren(
         ...(decks.length
           ? decks.map((d) => el('div', { class: 'combo-item' + (d === input.value ? ' current' : ''), role: 'option', onmousedown: (e) => (e.preventDefault(), pick(d)) }, d))
-          : [el('div', { class: 'combo-empty' }, deckCache ? tr('没有牌组，可直接输入新名称') : tr('未连接 Anki，可直接输入牌组名称'))])
+          : [el('div', { class: 'combo-empty' }, emptyText())])
       );
       list.hidden = false;
       wrap.classList.add('open');
@@ -691,7 +706,11 @@ kbd{font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-
         onclick: () => {
           if (!list.hidden) return close();
           input.focus();
-          loadDecks(() => open(false));
+          // 先显示上次的列表，读到 Anki 里的最新牌组后，列表还开着就更新
+          open(false);
+          loadDecks(() => {
+            if (!list.hidden) open(filtering);
+          });
         },
       },
       icon('chevron')
@@ -945,6 +964,7 @@ kbd{font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-
         }
         r.added = true;
         r.noteId = res.data.noteId;
+        rememberDeck(res.data.deckName);
         if (r.cacheKey) PC.cachePut(r.cacheKey, { text: r.text, noteId: res.data.noteId }).catch(() => {});
         refreshAddButton(r);
         setStatus(

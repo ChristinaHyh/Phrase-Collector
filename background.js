@@ -157,7 +157,9 @@ async function httpError(res, provider) {
       404: tr('接口地址或模型名称不存在'),
       429: tr('请求过于频繁或额度不足'),
     }[res.status] || tr('请求失败');
-  return new Error(tr('{hint}（HTTP {status}）', { hint, status: res.status }) + (detail ? tr('：') + detail : ''));
+  // 少数模型只能思考（或不能思考），收到思考开关会报错
+  const thinkingHint = res.status === 400 && PC.thinkingOf(provider) ? tr('如果是「思考」设置导致，请在 AI 服务里改为「服务默认」') : '';
+  return new Error(tr('{hint}（HTTP {status}）', { hint, status: res.status }) + (detail ? tr('：') + detail : '') + (thinkingHint ? ' · ' + thinkingHint : ''));
 }
 
 async function* sseEvents(res, signal) {
@@ -279,6 +281,7 @@ async function streamAI(provider, system, user, { signal, onText, onThinking } =
       stream: true,
       ...(temperature != null && !Number.isNaN(temperature) ? { temperature } : {}),
       ...(provider.jsonMode ? { response_format: { type: 'json_object' } } : {}),
+      ...PC.thinkingParams(provider),
     }),
   });
   if (!res.ok) throw await httpError(res, provider);

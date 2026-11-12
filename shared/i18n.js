@@ -49,6 +49,14 @@ globalThis.PC_I18N_EN = {
   '与扩展后台的连接已断开，请重试（如刚更新过扩展，请刷新页面）': 'Lost connection to the extension. Please retry (if you just updated the extension, reload the page).',
   '没有牌组，可直接输入新名称': 'No decks yet. Type a new name.',
   '未连接 Anki，可直接输入牌组名称': 'Anki is not connected. You can type a deck name.',
+  '正在读取牌组…': 'Loading decks…',
+  '思考': 'Thinking',
+  '关闭': 'Off',
+  '开启': 'On',
+  '服务默认': 'Provider default',
+  '开启后模型会先想一想再回答，等待时间更长。如果选了「关闭」或「开启」后划词报错，说明这个模型不支持切换，改成「服务默认」即可。': "With thinking on, the model thinks before it answers, so you wait longer. If selecting text gives an error after you choose Off or On, the model can't switch; choose Provider default.",
+  '这个服务没有可以在插件里切换的思考开关，由模型自己决定。想更快出结果，可以选用不思考的模型。': "This provider has no thinking switch the extension can set, so the model decides. For faster results, choose a model that doesn't think.",
+  '如果是「思考」设置导致，请在 AI 服务里改为「服务默认」': 'If the Thinking setting caused this, set it to Provider default under AI providers',
   选择牌组: 'Choose deck',
   重试: 'Retry',
   '模型思考中…': 'Model is thinking…',
@@ -151,7 +159,6 @@ globalThis.PC_I18N_EN = {
   完整: 'Full',
   简版: 'Lite',
   完整版: 'Full',
-  '简版（省 Token）': 'Lite (fewer tokens)',
   '简版只对两个内置动作生效：提示词更短，Phrase in Context 只输出短语译文、语境释义、原句和原句译文，Sentence Decode 只输出整句译文和一个关键短语的译文与解释。每次花费约为完整版的三分之一。也可以在工具栏弹窗中随时切换。':
     'Lite applies to the two built-in actions with shorter prompts. Phrase in Context returns only the translation of the expression, its meaning in context, the original sentence and its translation; Sentence Decode returns only the sentence translation and one key phrase with its translation and explanation. Each call costs about a third of the full version. You can also switch it from the toolbar popup.',
   '正在编辑简版，在「解析模式」为简版时使用。输出字段名应与完整版一致，才能写入同一个 Anki 笔记类型。':

@@ -151,6 +151,12 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
     return P.labels[code] ? code : 'en';
   }
 
+  // 内置动作的图标：线条图标，与面板、设置页的其他图标一致。before 是旧版默认的 emoji
+  const BUILTIN_ICONS = {
+    phrase: { now: 'svg:message', before: ['💬'] },
+    sentence: { now: 'svg:blocks', before: ['🧩'] },
+  };
+
   const PHRASE_FILLS = { Expression: 'selection', SourceTitle: 'webTitle', SourceURL: 'webUrl' };
 
   function defaultActions(language = DEFAULT_TARGET_LANGUAGE) {
@@ -168,7 +174,7 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
         id: 'phrase-in-context',
         builtin: 'phrase',
         name: P.phrase.name,
-        icon: '💬',
+        icon: BUILTIN_ICONS.phrase.now,
         enabled: true,
         providerId: 'deepseek-default',
         shortcut: P.phrase.shortcut,
@@ -198,7 +204,7 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
         id: 'sentence-decode',
         builtin: 'sentence',
         name: P.sentence.name,
-        icon: '🧩',
+        icon: BUILTIN_ICONS.sentence.now,
         enabled: true,
         providerId: 'deepseek-default',
         shortcut: P.sentence.shortcut,
@@ -260,7 +266,7 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
   }
 
   const PROVIDER_PRESETS = [
-    { key: 'deepseek', name: 'DeepSeek', type: 'openai', baseURL: 'https://api.deepseek.com', model: 'deepseek-flash' },
+    { key: 'deepseek', name: 'DeepSeek', type: 'openai', baseURL: 'https://api.deepseek.com', model: 'deepseek-flash', thinking: 'off' },
     { key: 'openai', name: 'OpenAI', type: 'openai', baseURL: 'https://api.openai.com/v1', model: '' },
     { key: 'openrouter', name: 'OpenRouter', type: 'openai', baseURL: 'https://openrouter.ai/api/v1', model: '' },
     { key: 'siliconflow', name: '硅基流动 SiliconFlow', type: 'openai', baseURL: 'https://api.siliconflow.cn/v1', model: '' },
@@ -301,6 +307,7 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
           model: 'deepseek-flash',
           temperature: 0.3,
           jsonMode: true,
+          thinking: 'off',
         },
       ],
       actions: defaultActions(DEFAULT_TARGET_LANGUAGE),
@@ -343,6 +350,8 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
     for (const a of cfg.actions) if (a.builtin && !a.lite) a.lite = builtinDefaults(a.builtin, cfg.general.targetLanguage)?.lite;
     // 要在 localizeBuiltins 之前：它会把旧默认说明同步成新默认（空），之后就认不出旧版了
     for (const a of cfg.actions) fillExpressionFromSelection(a);
+    // 内置动作还用着旧版默认 emoji 的，换成线条图标；用户自己选过的不动
+    for (const a of cfg.actions) if (BUILTIN_ICONS[a.builtin]?.before.includes(a.icon)) a.icon = BUILTIN_ICONS[a.builtin].now;
     localizeBuiltins(cfg);
     cfg.version = CONFIG_VERSION;
     setLang(cfg.general.uiLanguage);
@@ -896,6 +905,45 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
 
   const providerBaseUrl = (p) => p?.baseURL || PROVIDER_DEFAULT_URLS[p?.type] || '';
 
+  // 思考开关：各服务的参数名不同，只给官方文档写明了参数的 OpenAI 兼容服务发送。
+  // 其他服务不发送任何参数，由模型自己决定是否思考。
+  const thinkingType = (on) => ({ thinking: { type: on ? 'enabled' : 'disabled' } });
+  const enableThinking = (on) => ({ enable_thinking: on });
+  const THINKING_RULES = [
+    [/(^|\.)deepseek\.com$/, thinkingType],
+    [/(^|\.)bigmodel\.cn$/, thinkingType],
+    [/(^|\.)volces\.com$/, thinkingType],
+    [/(^|\.)(moonshot\.cn|moonshot\.ai|kimi\.com)$/, thinkingType],
+    [/(^|\.)aliyuncs\.com$/, enableThinking],
+    [/(^|\.)siliconflow\.(cn|com)$/, enableThinking],
+    [/(^|\.)openrouter\.ai$/, (on) => ({ reasoning: on ? { enabled: true } : { effort: 'none' } })],
+  ];
+
+  function thinkingRule(provider) {
+    if (provider?.type && provider.type !== 'openai') return null;
+    let host = '';
+    try {
+      host = new URL(providerBaseUrl(provider)).hostname;
+    } catch {
+      return null;
+    }
+    return THINKING_RULES.find(([re]) => re.test(host))?.[1] || null;
+  }
+
+  const supportsThinkingSwitch = (provider) => !!thinkingRule(provider);
+
+  // 'off' 关闭、'on' 开启、'' 服务默认（不发送）。DeepSeek 没设置过时按关闭：它默认会长时间思考，划词用不上
+  function thinkingOf(provider) {
+    if (!thinkingRule(provider)) return '';
+    if (['off', 'on', ''].includes(provider?.thinking)) return provider.thinking;
+    return /(^|\.)deepseek\.com$/.test(new URL(providerBaseUrl(provider)).hostname) ? 'off' : '';
+  }
+
+  function thinkingParams(provider) {
+    const mode = thinkingOf(provider);
+    return mode ? thinkingRule(provider)(mode === 'on') : {};
+  }
+
   // 已授权的匹配模式。*:// 规则只授权了其中一种协议时（如 manifest 预先声明的 http://localhost），返回那一种。
   // content script 中没有 chrome.permissions，只在扩展页面和后台使用
   async function grantedPatterns(patterns) {
@@ -1190,6 +1238,9 @@ ${fields.slice(1).map((f) => section(f, f)).join('\n')}
     originPatterns,
     originPatternForUrl,
     providerBaseUrl,
+    supportsThinkingSwitch,
+    thinkingOf,
+    thinkingParams,
     needsApiKey,
     grantedPatterns,
     ungrantedOrigins,
